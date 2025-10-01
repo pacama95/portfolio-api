@@ -46,17 +46,17 @@ public class TwelveDataMarketDataService implements MarketDataService {
         log.debug("Fetching current price for ticker: {}", ticker);
 
         return twelveDataClient.getPrice(ticker.trim().toUpperCase(), apiKey)
-            .map(response -> {
-                if (response == null || !response.isSuccessful()) {
-                    log.error("Invalid response from TwelveData for ticker: {}, response: {}", ticker, response);
-                    throw new RuntimeException("Failed to get price from TwelveData for ticker: " + ticker);
-                }
-                
-                log.info("Successfully retrieved price {} for ticker: {}", response.price(), ticker);
-                return response.price();
-            })
-            .onFailure().invoke(throwable -> 
-                log.error("Error fetching price from TwelveData for ticker: {}", ticker, throwable)
-            );
+                .map(response -> {
+                    if (response == null) {
+                        log.error("Invalid response from TwelveData for ticker: {}, response: {}", ticker, response);
+                        throw new RuntimeException("Failed to get price from TwelveData for ticker: " + ticker);
+                    }
+
+                    log.info("Successfully retrieved price {} for ticker: {}", response.price(), ticker);
+                    return response.price();
+                })
+                .onFailure().invoke(throwable ->
+                        log.error("Error fetching price from TwelveData for ticker: {}", ticker, throwable)
+                );
     }
 }

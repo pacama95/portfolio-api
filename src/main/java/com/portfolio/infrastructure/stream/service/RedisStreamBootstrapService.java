@@ -83,13 +83,18 @@ public class RedisStreamBootstrapService {
 
     /**
      * Create consumer group for a stream (idempotent)
+     * Uses MKSTREAM to automatically create the stream if it doesn't exist
      */
     private Uni<Void> createConsumerGroup(String streamName) {
-        log.debug("Creating consumer group {} for stream: {}", config.group(), streamName);
+        log.debug("Creating consumer group {} for stream: {} (with MKSTREAM)", config.group(), streamName);
 
-        return streamCommands.xgroupCreate(streamName, config.group(), "0")
+        io.quarkus.redis.datasource.stream.XGroupCreateArgs args =
+                new io.quarkus.redis.datasource.stream.XGroupCreateArgs()
+                        .mkstream();
+
+        return streamCommands.xgroupCreate(streamName, config.group(), "0", args)
                 .onItem().transform(result -> {
-                    log.debug("Consumer group {} created/verified for stream: {}",
+                    log.info("Consumer group {} and stream {} created/verified successfully",
                             config.group(), streamName);
                     return (Void) null;
                 })
