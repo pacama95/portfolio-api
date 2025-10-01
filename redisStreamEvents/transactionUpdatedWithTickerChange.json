@@ -1,0 +1,36 @@
+{
+  "eventId": "9a8b7c6d-4e3f-2a1b-0c9d-8e7f6a5b4c3d",
+  "occurredAt": "2025-09-30T14:30:00Z",
+  "messageCreatedAt": "2025-09-30T14:30:01Z",
+  "payload": {
+    "previousTransaction": {
+      "id": "a1b2c3d4-1111-2222-3333-444455556666",
+      "ticker": "APPL",
+      "transactionType": "BUY",
+      "quantity": 10.0,
+      "price": 250.0,
+      "fees": 2.0,
+      "currency": "USD",
+      "transactionDate": "2025-09-15",
+      "notes": "Wrong ticker - should be AAPL",
+      "isFractional": false,
+      "fractionalMultiplier": 1.0,
+      "commissionCurrency": "USD"
+    },
+    "newTransaction": {
+      "id": "a1b2c3d4-1111-2222-3333-444455556666",
+      "ticker": "AAPL",
+      "transactionType": "BUY",
+      "quantity": 10.0,
+      "price": 250.0,
+      "fees": 2.0,
+      "currency": "USD",
+      "transactionDate": "2025-09-15",
+      "notes": "Corrected ticker to AAPL",
+      "isFractional": false,
+      "fractionalMultiplier": 1.0,
+      "commissionCurrency": "USD"
+    }
+  }
+}
+

@@ -1,0 +1,19 @@
+{
+    "eventId": "c0a1b2c3-d4e5-46f7-8a90-b1c2d3e4f5a6",
+    "occurredAt": "2025-09-24T10:25:10Z",
+    "messageCreatedAt": "2025-09-24T10:25:11Z",
+    "payload": {
+      "id": "a1b2c3d4-1111-2222-3333-444455556666",
+      "ticker": "AAPL",
+      "transactionType": "BUY",
+      "quantity": 10.0,
+      "price": 123.45,
+      "fees": 1.25,
+      "currency": "USD",
+      "transactionDate": "2024-06-01",
+      "notes": "Transaction to be deleted/rolled back",
+      "isFractional": false,
+      "fractionalMultiplier": 1.0,
+      "commissionCurrency": "USD"
+    }
+  }

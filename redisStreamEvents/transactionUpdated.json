@@ -1,0 +1,35 @@
+{
+    "eventId": "7f9c4e28-5d1b-49de-8b8a-2a6c5c7e3f22",
+    "occurredAt": "2025-09-24T10:20:05Z",
+    "messageCreatedAt": "2025-09-24T10:20:06Z",
+    "payload": {
+      "previousTransaction": {
+        "id": "a1b2c3d4-1111-2222-3333-444455556666",
+        "ticker": "MSFT",
+        "transactionType": "BUY",
+        "quantity": 10.0,
+        "price": 250.0,
+        "fees": 2.0,
+        "currency": "GBP",
+        "transactionDate": "2024-08-01",
+        "notes": "Original purchase",
+        "isFractional": false,
+        "fractionalMultiplier": 1.0,
+        "commissionCurrency": "USD"
+      },
+      "newTransaction": {
+        "id": "a1b2c3d4-1111-2222-3333-444455556666",
+        "ticker": "MSFT",
+        "transactionType": "BUY",
+        "quantity": 15.0,
+        "price": 260.0,
+        "fees": 2.5,
+        "currency": "GBP",
+        "transactionDate": "2024-08-01",
+        "notes": "Updated quantity and price",
+        "isFractional": false,
+        "fractionalMultiplier": 1.0,
+        "commissionCurrency": "USD"
+      }
+    }
+  }
