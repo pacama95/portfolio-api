@@ -20,6 +20,8 @@ public class CurrentPosition {
     private LocalDate lastUpdated;
     private Boolean isActive;
     private LocalDateTime currentPriceTimestamp;
+    private String exchange;
+    private String country;
 
     // Default constructor
     public CurrentPosition() {
@@ -39,6 +41,8 @@ public class CurrentPosition {
         this.lastUpdated = position.getLastUpdated();
         this.isActive = position.getIsActive();
         this.currentPriceTimestamp = LocalDateTime.now();
+        this.exchange = position.getExchange();
+        this.country = position.getCountry();
     }
 
     // Constructor from Position with updated current price and custom timestamp
@@ -53,6 +57,8 @@ public class CurrentPosition {
         this.lastUpdated = position.getLastUpdated();
         this.isActive = position.getIsActive();
         this.currentPriceTimestamp = priceTimestamp;
+        this.exchange = position.getExchange();
+        this.country = position.getCountry();
     }
 
     // Constructor with required fields
@@ -146,4 +152,10 @@ public class CurrentPosition {
     public void setCurrentPriceTimestamp(LocalDateTime currentPriceTimestamp) { 
         this.currentPriceTimestamp = currentPriceTimestamp; 
     }
+
+    public String getExchange() { return exchange; }
+    public void setExchange(String exchange) { this.exchange = exchange; }
+
+    public String getCountry() { return country; }
+    public void setCountry(String country) { this.country = country; }
 }

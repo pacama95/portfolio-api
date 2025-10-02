@@ -155,7 +155,9 @@ public class TransactionDeletedConsumer extends BaseRedisStreamConsumer {
                         deletedEvent.fees(),
                         deletedEvent.currency(),
                         deletedEvent.transactionDate(),
-                        envelope.getOccurredAt()
+                        envelope.getOccurredAt(),
+                        deletedEvent.exchange(),
+                        deletedEvent.country()
                 );
 
                 final Context context = VertxContext.getOrCreateDuplicatedContext();

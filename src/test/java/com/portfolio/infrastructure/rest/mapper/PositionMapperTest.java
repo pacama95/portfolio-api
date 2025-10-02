@@ -36,6 +36,8 @@ class PositionMapperTest {
             LocalDate.of(2024, 3, 3),
             LocalDate.of(2024, 2, 1),
             true,
+            null,
+            null,
             null
         );
 
@@ -89,6 +91,8 @@ class PositionMapperTest {
             LocalDate.now().minusDays(1),
             LocalDate.now().minusDays(10),
             true,
+            null,
+            null,
             null
         );
         
@@ -265,6 +269,8 @@ class PositionMapperTest {
             lastUpdated,
             LocalDate.of(2024, 1, 1),
             false,
+            null,
+            null,
             null
         );
         
@@ -312,6 +318,8 @@ class PositionMapperTest {
             LocalDate.now().minusDays(1),
             LocalDate.now().minusDays(10),
             true,
+            null,
+            null,
             null
         );
     }

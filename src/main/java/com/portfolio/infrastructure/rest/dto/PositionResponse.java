@@ -34,5 +34,9 @@ public record PositionResponse(
     @Schema(description = "Unrealized gain or loss", example = "2437.50")
     BigDecimal unrealizedGainLoss,
     @Schema(description = "Unrealized gain or loss as percentage", example = "6.70")
-    BigDecimal unrealizedGainLossPercentage
+    BigDecimal unrealizedGainLossPercentage,
+    @Schema(description = "Stock exchange where the position is traded", example = "NASDAQ")
+    String exchange,
+    @Schema(description = "Country of the exchange or company headquarters", example = "United States")
+    String country
 ) {} 

@@ -46,6 +46,14 @@ public class ProcessTransactionCreatedService implements ProcessTransactionCreat
                     Position position = existingPosition != null ? existingPosition : createNewPosition(command);
                     position.applyTransaction(command.transactionType(), command.quantity(), command.price(), command.fees());
                     position.updateLastEventAppliedAt(command.occurredAt());
+                    
+                    // Update exchange and country if provided
+                    if (command.exchange() != null) {
+                        position.updateExchange(command.exchange());
+                    }
+                    if (command.country() != null) {
+                        position.updateCountry(command.country());
+                    }
 
                     Uni<Position> saveOperation = existingPosition != null
                             ? positionRepository.update(position)

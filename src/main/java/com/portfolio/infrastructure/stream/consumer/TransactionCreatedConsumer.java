@@ -159,7 +159,9 @@ public class TransactionCreatedConsumer extends BaseRedisStreamConsumer {
                         createdEvent.fees(),
                         createdEvent.currency(),
                         createdEvent.transactionDate(),
-                        envelope.getOccurredAt()
+                        envelope.getOccurredAt(),
+                        createdEvent.exchange(),
+                        createdEvent.country()
                 );
 
                 final Context context = VertxContext.getOrCreateDuplicatedContext();

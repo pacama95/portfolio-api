@@ -47,6 +47,8 @@ public interface ProcessTransactionUpdatedUseCase {
         BigDecimal price,
         BigDecimal fees,
         String currency,
-        LocalDate transactionDate
+        LocalDate transactionDate,
+        String exchange,
+        String country
     ) {}
 }

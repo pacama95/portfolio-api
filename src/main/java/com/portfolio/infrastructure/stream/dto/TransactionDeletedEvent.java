@@ -24,5 +24,7 @@ public record TransactionDeletedEvent(
     @JsonProperty("notes") String notes,
     @JsonProperty("isFractional") Boolean isFractional,
     @JsonProperty("fractionalMultiplier") BigDecimal fractionalMultiplier,
-    @JsonProperty("commissionCurrency") String commissionCurrency
+    @JsonProperty("commissionCurrency") String commissionCurrency,
+    @JsonProperty("exchange") String exchange,
+    @JsonProperty("country") String country
 ) implements TransactionEvent {}

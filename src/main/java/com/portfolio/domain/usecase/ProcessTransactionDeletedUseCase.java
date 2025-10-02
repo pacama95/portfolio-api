@@ -39,6 +39,8 @@ public interface ProcessTransactionDeletedUseCase {
         BigDecimal fees,
         String currency,
         LocalDate transactionDate,
-        Instant occurredAt
+        Instant occurredAt,
+        String exchange,
+        String country
     ) {}
 }

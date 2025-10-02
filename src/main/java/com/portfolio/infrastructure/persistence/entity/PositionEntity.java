@@ -73,6 +73,12 @@ public class PositionEntity {
     @Column(name = "last_event_applied_at")
     private Instant lastEventAppliedAt;
 
+    @Column(name = "exchange", length = 100)
+    private String exchange;
+
+    @Column(name = "country", length = 100)
+    private String country;
+
     // Default constructor
     public PositionEntity() {
     }

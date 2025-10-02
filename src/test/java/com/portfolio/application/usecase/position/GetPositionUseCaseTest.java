@@ -458,6 +458,8 @@ class GetPositionUseCaseTest {
             LocalDate.now().minusDays(1),
             LocalDate.now().minusDays(10),
             true,
+            null,
+            null,
             null
         );
         
@@ -473,6 +475,8 @@ class GetPositionUseCaseTest {
             LocalDate.now().minusDays(1),
             LocalDate.now().minusDays(10),
             true,
+            null,
+            null,
             null
         );
         
@@ -495,6 +499,8 @@ class GetPositionUseCaseTest {
             LocalDate.now().minusDays(1),
             LocalDate.now().minusDays(10),
             true,
+            null,
+            null,
             null
         );
     }

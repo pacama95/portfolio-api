@@ -253,6 +253,8 @@ class GetPortfolioSummaryUseCaseTest {
             LocalDate.now().minusDays(1),
             LocalDate.now().minusDays(10),
             true,
+            null,
+            null,
             null
         );
 

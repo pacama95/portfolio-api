@@ -54,7 +54,7 @@ class ProcessTransactionDeletedServiceTest {
                 .thenReturn(Uni.createFrom().item(position));
 
         ProcessTransactionDeletedUseCase.Command command = new ProcessTransactionDeletedUseCase.Command(
-                transactionId, ticker, "BUY", quantity, price, fees, "USD", LocalDate.now(), occurredAt
+                transactionId, ticker, "BUY", quantity, price, fees, "USD", LocalDate.now(), occurredAt, null, null
         );
 
         // When
@@ -98,7 +98,7 @@ class ProcessTransactionDeletedServiceTest {
                 .thenReturn(Uni.createFrom().item(position));
 
         ProcessTransactionDeletedUseCase.Command command = new ProcessTransactionDeletedUseCase.Command(
-                transactionId, ticker, "SELL", quantity, price, fees, "USD", LocalDate.now(), occurredAt
+                transactionId, ticker, "SELL", quantity, price, fees, "USD", LocalDate.now(), occurredAt, null, null
         );
 
         // When
@@ -131,7 +131,7 @@ class ProcessTransactionDeletedServiceTest {
 
         ProcessTransactionDeletedUseCase.Command command = new ProcessTransactionDeletedUseCase.Command(
                 transactionId, ticker, "BUY", BigDecimal.TEN, new BigDecimal("200.00"), 
-                BigDecimal.ONE, "USD", LocalDate.now(), occurredAt
+                BigDecimal.ONE, "USD", LocalDate.now(), occurredAt, null, null
         );
 
         // When
@@ -167,7 +167,7 @@ class ProcessTransactionDeletedServiceTest {
 
         ProcessTransactionDeletedUseCase.Command command = new ProcessTransactionDeletedUseCase.Command(
                 transactionId, ticker, "BUY", BigDecimal.TEN, new BigDecimal("150.00"), 
-                BigDecimal.ONE, "USD", LocalDate.now(), oldEventTime
+                BigDecimal.ONE, "USD", LocalDate.now(), oldEventTime, null, null
         );
 
         // When
@@ -206,7 +206,7 @@ class ProcessTransactionDeletedServiceTest {
 
         ProcessTransactionDeletedUseCase.Command command = new ProcessTransactionDeletedUseCase.Command(
                 transactionId, ticker, "BUY", BigDecimal.TEN, new BigDecimal("400.00"), 
-                BigDecimal.ONE, "USD", LocalDate.now(), occurredAt
+                BigDecimal.ONE, "USD", LocalDate.now(), occurredAt, null, null
         );
 
         // When
@@ -245,7 +245,7 @@ class ProcessTransactionDeletedServiceTest {
 
         ProcessTransactionDeletedUseCase.Command command = new ProcessTransactionDeletedUseCase.Command(
                 transactionId, ticker, "BUY", BigDecimal.TEN, new BigDecimal("180.00"), 
-                BigDecimal.ONE, "USD", LocalDate.now(), occurredAt
+                BigDecimal.ONE, "USD", LocalDate.now(), occurredAt, null, null
         );
 
         // When
@@ -278,7 +278,7 @@ class ProcessTransactionDeletedServiceTest {
                 .thenReturn(Uni.createFrom().item(position));
 
         ProcessTransactionDeletedUseCase.Command command = new ProcessTransactionDeletedUseCase.Command(
-                transactionId, ticker, "BUY", quantity, price, fees, "USD", LocalDate.now(), occurredAt
+                transactionId, ticker, "BUY", quantity, price, fees, "USD", LocalDate.now(), occurredAt, null, null
         );
 
         // When

@@ -25,6 +25,8 @@ public class Position {
     private LocalDate firstPurchaseDate;
     private Boolean isActive;
     private Instant lastEventAppliedAt; // For event ordering and idempotency
+    private String exchange;
+    private String country;
 
     // Constructor with required fields for creating new positions
     public Position(String ticker, Currency currency) {
@@ -52,7 +54,9 @@ public class Position {
                     LocalDate lastUpdated,
                     LocalDate firstPurchaseDate,
                     Boolean isActive,
-                    Instant lastEventAppliedAt) {
+                    Instant lastEventAppliedAt,
+                    String exchange,
+                    String country) {
         this.id = id;
         this.ticker = ticker;
         this.sharesOwned = sharesOwned;
@@ -65,6 +69,8 @@ public class Position {
         this.firstPurchaseDate = firstPurchaseDate;
         this.isActive = isActive;
         this.lastEventAppliedAt = lastEventAppliedAt;
+        this.exchange = exchange;
+        this.country = country;
     }
 
     /**
@@ -316,5 +322,19 @@ public class Position {
     public boolean shouldIgnoreEvent(Instant eventOccurredAt) {
         return this.lastEventAppliedAt != null &&
                 !eventOccurredAt.isAfter(this.lastEventAppliedAt);
+    }
+
+    /**
+     * Update exchange information
+     */
+    public void updateExchange(String exchange) {
+        this.exchange = exchange;
+    }
+
+    /**
+     * Update country information
+     */
+    public void updateCountry(String country) {
+        this.country = country;
     }
 } 

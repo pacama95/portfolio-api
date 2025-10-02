@@ -167,7 +167,9 @@ public class TransactionUpdatedConsumer extends BaseRedisStreamConsumer {
                                 previousTx.price(),
                                 previousTx.fees(),
                                 previousTx.currency(),
-                                previousTx.transactionDate()
+                                previousTx.transactionDate(),
+                                previousTx.exchange(),
+                                previousTx.country()
                         ),
                         new ProcessTransactionUpdatedUseCase.TransactionData(
                                 newTx.id(),
@@ -177,7 +179,9 @@ public class TransactionUpdatedConsumer extends BaseRedisStreamConsumer {
                                 newTx.price(),
                                 newTx.fees(),
                                 newTx.currency(),
-                                newTx.transactionDate()
+                                newTx.transactionDate(),
+                                newTx.exchange(),
+                                newTx.country()
                         ),
                         envelope.getOccurredAt()
                 );

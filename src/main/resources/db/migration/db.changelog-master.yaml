@@ -7,3 +7,11 @@ databaseChangeLog:
             path: schema.sql
             relativeToChangelogFile: true
             splitStatements: false
+  - changeSet:
+      id: add-exchange-country-columns
+      author: portfolio
+      changes:
+        - sqlFile:
+            path: add-exchange-country-columns.sql
+            relativeToChangelogFile: true
+            splitStatements: true

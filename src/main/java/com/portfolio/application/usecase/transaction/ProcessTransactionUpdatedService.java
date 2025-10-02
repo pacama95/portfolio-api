@@ -82,6 +82,14 @@ public class ProcessTransactionUpdatedService implements ProcessTransactionUpdat
                     );
 
                     existingPosition.updateLastEventAppliedAt(command.occurredAt());
+                    
+                    // Update exchange and country from new transaction if provided
+                    if (newTx.exchange() != null) {
+                        existingPosition.updateExchange(newTx.exchange());
+                    }
+                    if (newTx.country() != null) {
+                        existingPosition.updateCountry(newTx.country());
+                    }
 
                     return positionRepository.update(existingPosition).map(saved -> (Result) new Result.Success(saved));
                 })
@@ -150,6 +158,15 @@ public class ProcessTransactionUpdatedService implements ProcessTransactionUpdat
                                                     newTx.fees()
                                             );
                                             createdPosition.updateLastEventAppliedAt(command.occurredAt());
+                                            
+                                            // Update exchange and country if provided
+                                            if (newTx.exchange() != null) {
+                                                createdPosition.updateExchange(newTx.exchange());
+                                            }
+                                            if (newTx.country() != null) {
+                                                createdPosition.updateCountry(newTx.country());
+                                            }
+                                            
                                             return positionRepository.save(createdPosition)
                                                     .map(saved -> (Result) new Result.Success(saved));
                                         } else {
@@ -170,6 +187,15 @@ public class ProcessTransactionUpdatedService implements ProcessTransactionUpdat
                                                     newTx.fees()
                                             );
                                             newPosition.updateLastEventAppliedAt(command.occurredAt());
+                                            
+                                            // Update exchange and country if provided
+                                            if (newTx.exchange() != null) {
+                                                newPosition.updateExchange(newTx.exchange());
+                                            }
+                                            if (newTx.country() != null) {
+                                                newPosition.updateCountry(newTx.country());
+                                            }
+                                            
                                             return positionRepository.update(newPosition)
                                                     .map(saved -> (Result) new Result.Success(saved));
                                         }
