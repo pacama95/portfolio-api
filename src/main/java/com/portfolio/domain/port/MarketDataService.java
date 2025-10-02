@@ -12,7 +12,7 @@ public interface MarketDataService {
     /**
      * Gets the current market price for a ticker
      * @param ticker Stock ticker symbol (e.g., "AAPL", "MSFT")
-     * @return Current market price
+     * @param exchange Stock exchange (e.g., "BME", "NYSE")
      */
-    Uni<BigDecimal> getCurrentPrice(String ticker);
+    Uni<BigDecimal> getCurrentPrice(String ticker, String exchange);
 }

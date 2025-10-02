@@ -12,6 +12,7 @@ import io.quarkiverse.mcp.server.ToolCallException;
 import io.quarkus.logging.Log;
 import io.smallrye.mutiny.Uni;
 import jakarta.inject.Inject;
+import jakarta.inject.Named;
 import jakarta.inject.Singleton;
 
 import java.math.BigDecimal;
@@ -32,6 +33,7 @@ public class PortfolioMcpServer {
     GetPortfolioSummaryUseCase getPortfolioSummaryUseCase;
 
     @Inject
+    @Named("twelveData")
     MarketDataService marketDataService;
 
     @Inject
@@ -129,7 +131,7 @@ public class PortfolioMcpServer {
 
     @Tool(description = "Get current market price for a stock ticker from TwelveData API.")
     public Uni<String> getCurrentPrice(@ToolArg(description = "Stock ticker symbol (e.g., AAPL, MSFT)") String ticker) {
-        return marketDataService.getCurrentPrice(ticker)
+        return marketDataService.getCurrentPrice(ticker, null)
             .map(price -> {
                 try {
                     return objectMapper.writeValueAsString(

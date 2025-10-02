@@ -1,11 +1,11 @@
 package com.portfolio.application.usecase.position;
 
+import com.portfolio.application.service.MarketDataPriceFetchService;
 import com.portfolio.domain.exception.Errors;
 import com.portfolio.domain.exception.ServiceException;
 import com.portfolio.domain.model.Currency;
 import com.portfolio.domain.model.CurrentPosition;
 import com.portfolio.domain.model.Position;
-import com.portfolio.domain.port.MarketDataService;
 import com.portfolio.domain.port.PositionRepository;
 import io.smallrye.mutiny.Uni;
 import io.smallrye.mutiny.helpers.test.UniAssertSubscriber;
@@ -27,16 +27,16 @@ import static org.mockito.Mockito.*;
 
 class GetPositionUseCaseTest {
     private PositionRepository positionRepository;
-    private MarketDataService marketDataService;
+    private MarketDataPriceFetchService marketDataPriceFetchService;
     private GetPositionUseCase useCase;
 
     @BeforeEach
     void setUp() {
         positionRepository = mock(PositionRepository.class);
-        marketDataService = mock(MarketDataService.class);
+        marketDataPriceFetchService = mock(MarketDataPriceFetchService.class);
         useCase = new GetPositionUseCase();
         useCase.positionRepository = positionRepository;
-        useCase.marketDataService = marketDataService;
+        useCase.marketDataPriceFetchService = marketDataPriceFetchService;
     }
 
     @Test
@@ -47,7 +47,7 @@ class GetPositionUseCaseTest {
         BigDecimal realTimePrice = new BigDecimal("175.50");
         
         when(positionRepository.findById(id)).thenReturn(Uni.createFrom().item(position));
-        when(marketDataService.getCurrentPrice("AAPL")).thenReturn(Uni.createFrom().item(realTimePrice));
+        when(marketDataPriceFetchService.getCurrentPrice("AAPL", null)).thenReturn(Uni.createFrom().item(realTimePrice));
 
         // When
         Uni<CurrentPosition> uni = useCase.getById(id);
@@ -61,7 +61,7 @@ class GetPositionUseCaseTest {
         assertEquals(position.getTicker(), result.getTicker());
         assertEquals(realTimePrice, result.getLatestMarketPrice());
         assertTrue(result.isCurrentPriceFresh());
-        verify(marketDataService).getCurrentPrice("AAPL");
+        verify(marketDataPriceFetchService).getCurrentPrice("AAPL", null);
     }
 
     @Test
@@ -69,10 +69,10 @@ class GetPositionUseCaseTest {
         // Given
         UUID id = UUID.randomUUID();
         Position position = createTestPosition("AAPL");
-        RuntimeException marketDataException = new RuntimeException("Market data API error");
+        RuntimeException marketDataException = new RuntimeException("All market data providers failed");
         
         when(positionRepository.findById(id)).thenReturn(Uni.createFrom().item(position));
-        when(marketDataService.getCurrentPrice("AAPL")).thenReturn(Uni.createFrom().failure(marketDataException));
+        when(marketDataPriceFetchService.getCurrentPrice("AAPL", null)).thenReturn(Uni.createFrom().failure(marketDataException));
 
         // When
         Uni<CurrentPosition> uni = useCase.getById(id);
@@ -86,7 +86,32 @@ class GetPositionUseCaseTest {
         assertEquals(position.getTicker(), result.getTicker());
         assertEquals(position.getLatestMarketPrice(), result.getLatestMarketPrice()); // Fallback to stored price
         assertFalse(result.isCurrentPriceFresh()); // Should use stored price timestamp
-        verify(marketDataService).getCurrentPrice("AAPL");
+        verify(marketDataPriceFetchService).getCurrentPrice("AAPL", null);
+    }
+
+    @Test
+    void testGetByIdWithMarketDataSuccess() {
+        // Given
+        UUID id = UUID.randomUUID();
+        Position position = createTestPosition("MSFT");
+        BigDecimal fetchedPrice = new BigDecimal("305.75");
+        
+        when(positionRepository.findById(id)).thenReturn(Uni.createFrom().item(position));
+        when(marketDataPriceFetchService.getCurrentPrice("MSFT", null)).thenReturn(Uni.createFrom().item(fetchedPrice));
+
+        // When
+        Uni<CurrentPosition> uni = useCase.getById(id);
+        CurrentPosition result = uni.subscribe().withSubscriber(UniAssertSubscriber.create())
+            .assertCompleted()
+            .getItem();
+
+        // Then
+        assertNotNull(result);
+        assertEquals(position.getId(), result.getId());
+        assertEquals(position.getTicker(), result.getTicker());
+        assertEquals(fetchedPrice, result.getLatestMarketPrice()); // Price from market data service
+        assertTrue(result.isCurrentPriceFresh()); // Should be fresh
+        verify(marketDataPriceFetchService).getCurrentPrice("MSFT", null);
     }
 
     @Test
@@ -115,7 +140,7 @@ class GetPositionUseCaseTest {
         BigDecimal realTimePrice = new BigDecimal("300.25");
 
         when(positionRepository.findByTicker(ticker)).thenReturn(Uni.createFrom().item(position));
-        when(marketDataService.getCurrentPrice(ticker)).thenReturn(Uni.createFrom().item(realTimePrice));
+        when(marketDataPriceFetchService.getCurrentPrice(ticker, null)).thenReturn(Uni.createFrom().item(realTimePrice));
 
         // When
         Uni<CurrentPosition> uni = useCase.getByTicker(ticker);
@@ -128,7 +153,7 @@ class GetPositionUseCaseTest {
         assertEquals(position.getTicker(), result.getTicker());
         assertEquals(realTimePrice, result.getLatestMarketPrice());
         assertTrue(result.isCurrentPriceFresh());
-        verify(marketDataService).getCurrentPrice(ticker);
+        verify(marketDataPriceFetchService).getCurrentPrice(ticker, null);
     }
 
     @Test
@@ -136,10 +161,10 @@ class GetPositionUseCaseTest {
         // Given
         String ticker = "GOOGL";
         Position position = createTestPosition(ticker);
-        RuntimeException marketDataException = new RuntimeException("API rate limit exceeded");
+        RuntimeException marketDataException = new RuntimeException("All market data providers failed");
         
         when(positionRepository.findByTicker(ticker)).thenReturn(Uni.createFrom().item(position));
-        when(marketDataService.getCurrentPrice(ticker)).thenReturn(Uni.createFrom().failure(marketDataException));
+        when(marketDataPriceFetchService.getCurrentPrice(ticker, null)).thenReturn(Uni.createFrom().failure(marketDataException));
 
         // When
         Uni<CurrentPosition> uni = useCase.getByTicker(ticker);
@@ -152,6 +177,7 @@ class GetPositionUseCaseTest {
         assertEquals(position.getTicker(), result.getTicker());
         assertEquals(position.getLatestMarketPrice(), result.getLatestMarketPrice()); // Fallback to stored price
         assertFalse(result.isCurrentPriceFresh());
+        verify(marketDataPriceFetchService).getCurrentPrice(ticker, null);
     }
 
     @Test
@@ -180,8 +206,8 @@ class GetPositionUseCaseTest {
         List<Position> positions = List.of(position1, position2);
         
         when(positionRepository.findAll()).thenReturn(Uni.createFrom().item(positions));
-        when(marketDataService.getCurrentPrice("AAPL")).thenReturn(Uni.createFrom().item(new BigDecimal("175.50")));
-        when(marketDataService.getCurrentPrice("MSFT")).thenReturn(Uni.createFrom().item(new BigDecimal("300.25")));
+        when(marketDataPriceFetchService.getCurrentPrice("AAPL", null)).thenReturn(Uni.createFrom().item(new BigDecimal("175.50")));
+        when(marketDataPriceFetchService.getCurrentPrice("MSFT", null)).thenReturn(Uni.createFrom().item(new BigDecimal("300.25")));
 
         // When
         Uni<List<CurrentPosition>> uni = useCase.getAll();
@@ -196,8 +222,8 @@ class GetPositionUseCaseTest {
         assertEquals("MSFT", result.get(1).getTicker());
         assertEquals(new BigDecimal("175.50"), result.get(0).getLatestMarketPrice());
         assertEquals(new BigDecimal("300.25"), result.get(1).getLatestMarketPrice());
-        verify(marketDataService).getCurrentPrice("AAPL");
-        verify(marketDataService).getCurrentPrice("MSFT");
+        verify(marketDataPriceFetchService).getCurrentPrice("AAPL", null);
+        verify(marketDataPriceFetchService).getCurrentPrice("MSFT", null);
     }
 
     @Test
@@ -214,7 +240,7 @@ class GetPositionUseCaseTest {
         // Then
         assertNotNull(result);
         assertTrue(result.isEmpty());
-        verifyNoInteractions(marketDataService);
+        verifyNoInteractions(marketDataPriceFetchService);
     }
 
     @Test
@@ -241,7 +267,7 @@ class GetPositionUseCaseTest {
         List<Position> positions = Collections.singletonList(position);
         
         when(positionRepository.findAllWithShares()).thenReturn(Uni.createFrom().item(positions));
-        when(marketDataService.getCurrentPrice("TSLA")).thenReturn(Uni.createFrom().item(new BigDecimal("800.75")));
+        when(marketDataPriceFetchService.getCurrentPrice("TSLA", null)).thenReturn(Uni.createFrom().item(new BigDecimal("800.75")));
 
         // When
         Uni<List<CurrentPosition>> uni = useCase.getActivePositions();
@@ -254,7 +280,7 @@ class GetPositionUseCaseTest {
         assertEquals(1, result.size());
         assertEquals("TSLA", result.get(0).getTicker());
         assertEquals(new BigDecimal("800.75"), result.get(0).getLatestMarketPrice());
-        verify(marketDataService).getCurrentPrice("TSLA");
+        verify(marketDataPriceFetchService).getCurrentPrice("TSLA", null);
     }
 
     @Test
@@ -265,8 +291,9 @@ class GetPositionUseCaseTest {
         List<Position> positions = List.of(position1, position2);
         
         when(positionRepository.findAllWithShares()).thenReturn(Uni.createFrom().item(positions));
-        when(marketDataService.getCurrentPrice("AAPL")).thenReturn(Uni.createFrom().item(new BigDecimal("175.50")));
-        when(marketDataService.getCurrentPrice("MSFT")).thenReturn(Uni.createFrom().failure(new RuntimeException("API error")));
+        when(marketDataPriceFetchService.getCurrentPrice("AAPL", null)).thenReturn(Uni.createFrom().item(new BigDecimal("175.50")));
+        when(marketDataPriceFetchService.getCurrentPrice("MSFT", null)).thenReturn(Uni.createFrom().failure(new RuntimeException("API error")));
+        when(marketDataPriceFetchService.getCurrentPrice("MSFT", null)).thenReturn(Uni.createFrom().failure(new RuntimeException("Alternative API error")));
 
         // When
         Uni<List<CurrentPosition>> uni = useCase.getActivePositions();
@@ -410,7 +437,8 @@ class GetPositionUseCaseTest {
         RuntimeException marketDataException = new RuntimeException("Service unavailable");
 
         when(positionRepository.findById(id)).thenReturn(Uni.createFrom().item(position));
-        when(marketDataService.getCurrentPrice(position.getTicker())).thenReturn(Uni.createFrom().failure(marketDataException));
+        when(marketDataPriceFetchService.getCurrentPrice(position.getTicker(), null)).thenReturn(Uni.createFrom().failure(marketDataException));
+        when(marketDataPriceFetchService.getCurrentPrice(position.getTicker(), null)).thenReturn(Uni.createFrom().failure(new RuntimeException("Alternative API error")));
 
         // When
         Uni<CurrentPosition> uni = useCase.getById(id);
@@ -423,7 +451,8 @@ class GetPositionUseCaseTest {
         assertEquals(expectedFallback, result.getLatestMarketPrice());
         assertFalse(result.isCurrentPriceFresh());
 
-        verify(marketDataService).getCurrentPrice(position.getTicker());
+        verify(marketDataPriceFetchService).getCurrentPrice(position.getTicker(), null);
+        verify(marketDataPriceFetchService).getCurrentPrice(position.getTicker(), null);
     }
 
     @Test
@@ -442,7 +471,7 @@ class GetPositionUseCaseTest {
         // Then
         assertNull(result);
 
-        verifyNoInteractions(marketDataService);
+        verifyNoInteractions(marketDataPriceFetchService);
     }
 
     static Stream<Arguments> fallbackScenarios() {

@@ -1,11 +1,11 @@
 package com.portfolio.application.usecase.position;
 
+import com.portfolio.application.service.MarketDataPriceFetchService;
 import com.portfolio.domain.exception.Errors;
 import com.portfolio.domain.exception.ServiceException;
 import com.portfolio.domain.model.Position;
 import com.portfolio.domain.model.CurrentPosition;
 import com.portfolio.domain.port.PositionRepository;
-import com.portfolio.domain.port.MarketDataService;
 import io.quarkus.hibernate.reactive.panache.common.WithSession;
 import io.smallrye.mutiny.Multi;
 import io.smallrye.mutiny.Uni;
@@ -29,7 +29,7 @@ public class GetPositionUseCase {
     PositionRepository positionRepository;
 
     @Inject
-    MarketDataService marketDataService;
+    MarketDataPriceFetchService marketDataPriceFetchService;
 
     /**
      * Gets a position by ID with real-time current price
@@ -118,6 +118,7 @@ public class GetPositionUseCase {
 
     /**
      * Enriches a single position with real-time current price from market data service
+     * Uses MarketDataPriceFetchService which handles fallback logic
      */
     private Uni<CurrentPosition> enrichWithCurrentPrice(Position position) {
         if (position == null || position.getTicker() == null) {
@@ -125,15 +126,18 @@ public class GetPositionUseCase {
             return Uni.createFrom().nullItem();
         }
 
-        return marketDataService.getCurrentPrice(position.getTicker())
+        String ticker = position.getTicker();
+        String exchange = position.getExchange();
+
+        return marketDataPriceFetchService.getCurrentPrice(ticker, exchange)
                 .map(currentPrice -> {
-                    log.info("Retrieved current price {} for ticker {}", currentPrice, position.getTicker());
+                    log.debug("Retrieved current price {} for ticker {}", currentPrice, ticker);
                     return new CurrentPosition(position, currentPrice);
                 })
-                .onFailure().recoverWithItem(throwable -> {
-                    log.error("Failed to fetch current price for ticker {}, using stored price", 
-                             position.getTicker(), throwable);
-                    // Fall back to stored current price if market data service fails
+                .onFailure().recoverWithItem(error -> {
+                    log.error("All market data providers failed for ticker {}, using stored price", ticker, error);
+                    
+                    // Fall back to stored current price if all providers fail
                     BigDecimal fallbackPrice = position.getLatestMarketPrice() != null ? 
                                              position.getLatestMarketPrice() : BigDecimal.ZERO;
                     // Use the position's lastUpdated date as the price timestamp since this is stored data

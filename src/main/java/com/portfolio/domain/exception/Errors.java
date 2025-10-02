@@ -34,4 +34,12 @@ public interface Errors {
         Error CALCULATION_ERROR = new Error(errorCode + "03");
     }
 
+    interface MarketData {
+        String errorCode = "06";
+
+        Error INVALID_INPUT = new Error(errorCode + "01");
+        Error PRICE_NOT_FOUND = new Error(errorCode + "02");
+        Error API_ERROR = new Error(errorCode + "03");
+    }
+
 }

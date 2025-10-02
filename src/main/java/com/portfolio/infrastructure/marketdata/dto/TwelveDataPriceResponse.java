@@ -14,7 +14,8 @@ public record TwelveDataPriceResponse(
     @JsonProperty("symbol") String symbol,
     @JsonProperty("timestamp") String timestamp,
     @JsonProperty("datetime") String datetime,
-    @JsonProperty("status") String status
+    @JsonProperty("status") String status,
+    @JsonProperty("code") String code
 ) {
     
     /**
@@ -22,5 +23,12 @@ public record TwelveDataPriceResponse(
      */
     public boolean isSuccessful() {
         return "ok".equalsIgnoreCase(status) && price != null;
+    }
+    
+    /**
+     * Checks if the response is an error
+     */
+    public boolean isError() {
+        return "error".equalsIgnoreCase(status) || ("404".equals(code) && price == null);
     }
 }
