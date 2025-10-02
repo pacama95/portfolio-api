@@ -111,7 +111,7 @@ public class TransactionDeletedConsumer extends BaseRedisStreamConsumer {
 
         return parseMessage(fields)
                 .onItem().transformToUni(envelope -> {
-                    if (!isValidEnvelope(envelope)) {
+                    if (isInvalidEnvelope(envelope)) {
                         log.warn("Invalid event envelope for message {}: {}", messageId, envelope);
                         // ACK invalid messages to avoid infinite retries
                         return acknowledgeMessage(messageId);

@@ -117,27 +117,27 @@ public abstract class BaseRedisStreamConsumer {
     /**
      * Validate the event envelope
      */
-    protected boolean isValidEnvelope(EventEnvelope envelope) {
+    protected boolean isInvalidEnvelope(EventEnvelope envelope) {
         if (envelope == null) {
             log.warn("Event envelope is null");
-            return false;
+            return true;
         }
 
         if (envelope.getEventId() == null) {
             log.warn("Event envelope missing eventId");
-            return false;
+            return true;
         }
 
         if (envelope.getOccurredAt() == null) {
             log.warn("Event envelope missing occurredAt");
-            return false;
+            return true;
         }
 
         if (envelope.getPayload() == null) {
             log.warn("Event envelope missing payload");
-            return false;
+            return true;
         }
 
-        return true;
+        return false;
     }
 }

@@ -6,6 +6,7 @@ import com.portfolio.infrastructure.stream.consumer.TransactionDeletedConsumer;
 import com.portfolio.infrastructure.stream.consumer.TransactionUpdatedConsumer;
 import io.quarkus.redis.datasource.ReactiveRedisDataSource;
 import io.quarkus.redis.datasource.stream.ReactiveStreamCommands;
+import io.quarkus.redis.datasource.stream.XGroupCreateArgs;
 import io.quarkus.runtime.StartupEvent;
 import io.smallrye.mutiny.Uni;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -23,6 +24,11 @@ import java.util.List;
 public class RedisStreamBootstrapService {
 
     private static final Logger log = LoggerFactory.getLogger(RedisStreamBootstrapService.class);
+    public static final String TRANSACTION_DELETED_STREAM = "transaction:deleted";
+    public static final String TRANSACTION_UPDATED_STREAM = "transaction:updated";
+    public static final String TRANSACTION_CREATED_STREAM = "transaction:created";
+    private static final List<String> TRANSACTION_STREAMS =
+            List.of(TRANSACTION_CREATED_STREAM, TRANSACTION_UPDATED_STREAM, TRANSACTION_DELETED_STREAM);
 
     @Inject
     ReactiveRedisDataSource redisDataSource;
@@ -63,21 +69,15 @@ public class RedisStreamBootstrapService {
     private Uni<Void> initializeStreamsAndConsumerGroup() {
         log.info("Initializing streams and consumer group: {}", config.group());
 
-        List<String> streamNames = List.of(
-                "transaction:created",
-                "transaction:updated",
-                "transaction:deleted"
-        );
-
         return Uni.join().all(
-                        streamNames.stream()
+                        TRANSACTION_STREAMS.stream()
                                 .map(this::createConsumerGroup)
                                 .toList()
                 ).andFailFast()
                 .onItem().transform(results -> {
                     log.info("Successfully initialized {} streams with consumer group: {}",
-                            streamNames.size(), config.group());
-                    return (Void) null;
+                            TRANSACTION_STREAMS.size(), config.group());
+                    return null;
                 });
     }
 
@@ -86,13 +86,10 @@ public class RedisStreamBootstrapService {
      * Uses MKSTREAM to automatically create the stream if it doesn't exist
      */
     private Uni<Void> createConsumerGroup(String streamName) {
-        log.debug("Creating consumer group {} for stream: {} (with MKSTREAM)", config.group(), streamName);
+        log.info("Creating consumer group {} for stream: {} (MKSTREAM)", config.group(), streamName);
 
-        io.quarkus.redis.datasource.stream.XGroupCreateArgs args =
-                new io.quarkus.redis.datasource.stream.XGroupCreateArgs()
-                        .mkstream();
-
-        return streamCommands.xgroupCreate(streamName, config.group(), "0", args)
+        return Uni.createFrom().item(() -> new XGroupCreateArgs().mkstream())
+                .map(args -> streamCommands.xgroupCreate(streamName, config.group(), "0", args))
                 .onItem().transform(result -> {
                     log.info("Consumer group {} and stream {} created/verified successfully",
                             config.group(), streamName);
@@ -102,7 +99,7 @@ public class RedisStreamBootstrapService {
                     // BUSYGROUP error means the group already exists, which is fine
                     if (throwable.getMessage() != null &&
                             throwable.getMessage().contains("BUSYGROUP")) {
-                        log.debug("Consumer group {} already exists for stream: {}",
+                        log.info("Consumer group {} already exists for stream: {}. Skipping creation.",
                                 config.group(), streamName);
                         return Uni.createFrom().voidItem();
                     }

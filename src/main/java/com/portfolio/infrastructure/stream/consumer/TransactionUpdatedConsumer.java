@@ -111,7 +111,7 @@ public class TransactionUpdatedConsumer extends BaseRedisStreamConsumer {
 
         return parseMessage(fields)
                 .onItem().transformToUni(envelope -> {
-                    if (!isValidEnvelope(envelope)) {
+                    if (isInvalidEnvelope(envelope)) {
                         log.warn("Invalid event envelope for message {}: {}", messageId, envelope);
                         // ACK invalid messages to avoid infinite retries
                         return acknowledgeMessage(messageId);
@@ -139,17 +139,17 @@ public class TransactionUpdatedConsumer extends BaseRedisStreamConsumer {
                 log.info("🔄 TRANSACTION UPDATED EVENT RECEIVED:");
                 log.info("   Event ID: {}", envelope.getEventId());
                 log.info("   Occurred At: {}", envelope.getOccurredAt());
-                
+
                 var previousTx = updatedEvent.previousTransaction();
                 var newTx = updatedEvent.newTransaction();
-                
+
                 log.info("   PREVIOUS TRANSACTION:");
                 log.info("      ID: {}", previousTx.id());
                 log.info("      Ticker: {}", previousTx.ticker());
                 log.info("      Type: {}", previousTx.transactionType());
                 log.info("      Quantity: {}", previousTx.quantity());
                 log.info("      Price: {}", previousTx.price());
-                
+
                 log.info("   NEW TRANSACTION:");
                 log.info("      ID: {}", newTx.id());
                 log.info("      Ticker: {}", newTx.ticker());
