@@ -6,6 +6,9 @@ import com.portfolio.application.usecase.portfolio.GetPortfolioSummaryUseCase;
 import com.portfolio.application.usecase.position.GetPositionUseCase;
 import com.portfolio.application.usecase.position.UpdateMarketDataUseCase;
 import com.portfolio.infrastructure.mcp.converter.ParameterConversionService;
+import com.portfolio.infrastructure.mcp.mapper.MarketPriceMcpMapper;
+import com.portfolio.infrastructure.mcp.mapper.PortfolioSummaryMcpMapper;
+import com.portfolio.infrastructure.mcp.mapper.PositionMcpMapper;
 import io.quarkiverse.mcp.server.Tool;
 import io.quarkiverse.mcp.server.ToolArg;
 import io.quarkiverse.mcp.server.ToolCallException;
@@ -15,6 +18,7 @@ import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 
 @Singleton
 public class PortfolioMcpServer {
@@ -37,14 +41,24 @@ public class PortfolioMcpServer {
     @Inject
     ParameterConversionService parameterConversionService;
 
+    @Inject
+    PositionMcpMapper positionMcpMapper;
+
+    @Inject
+    PortfolioSummaryMcpMapper portfolioSummaryMcpMapper;
+
+    @Inject
+    MarketPriceMcpMapper marketPriceMcpMapper;
+
     // ============ MCP TOOL METHODS ============
 
     @Tool(description = "Get all current positions in the portfolio.")
     public Uni<String> getAllPositions() {
         return getPositionUseCase.getAll()
-                .map(positions -> {
+                .map(positionMcpMapper::toCurrentPositionDtoList)
+                .map(dtos -> {
                     try {
-                        return objectMapper.writeValueAsString(positions);
+                        return objectMapper.writeValueAsString(dtos);
                     } catch (Exception e) {
                         throw new RuntimeException("Error serializing result", e);
                     }
@@ -56,9 +70,10 @@ public class PortfolioMcpServer {
     @Tool(description = "Get active positions in the portfolio (positions with shares > 0).")
     public Uni<String> getActivePositions() {
         return getPositionUseCase.getActivePositions()
-                .map(positions -> {
+                .map(positionMcpMapper::toCurrentPositionDtoList)
+                .map(dtos -> {
                     try {
-                        return objectMapper.writeValueAsString(positions);
+                        return objectMapper.writeValueAsString(dtos);
                     } catch (Exception e) {
                         throw new RuntimeException("Error serializing result", e);
                     }
@@ -70,9 +85,10 @@ public class PortfolioMcpServer {
     @Tool(description = "Get position details for a specific ticker.")
     public Uni<String> getPositionByTicker(@ToolArg(description = "Stock ticker symbol") String ticker) {
         return getPositionUseCase.getByTicker(ticker)
-                .map(position -> {
+                .map(positionMcpMapper::toDto)
+                .map(dto -> {
                     try {
-                        return objectMapper.writeValueAsString(position);
+                        return objectMapper.writeValueAsString(dto);
                     } catch (Exception e) {
                         throw new RuntimeException("Error serializing result", e);
                     }
@@ -88,9 +104,10 @@ public class PortfolioMcpServer {
         BigDecimal convertedCurrentPrice = (BigDecimal) parameterConversionService.convert(currentPrice, "currentPrice");
 
         return updateMarketDataUseCase.execute(ticker, convertedCurrentPrice)
-                .map(result -> {
+                .map(positionMcpMapper::toDto)
+                .map(dto -> {
                     try {
-                        return objectMapper.writeValueAsString(result);
+                        return objectMapper.writeValueAsString(dto);
                     } catch (Exception e) {
                         throw new RuntimeException("Error serializing result", e);
                     }
@@ -102,9 +119,10 @@ public class PortfolioMcpServer {
     @Tool(description = "Get portfolio summary with key metrics.")
     public Uni<String> getPortfolioSummary() {
         return getPortfolioSummaryUseCase.getPortfolioSummary()
-                .map(summary -> {
+                .map(portfolioSummaryMcpMapper::toDto)
+                .map(dto -> {
                     try {
-                        return objectMapper.writeValueAsString(summary);
+                        return objectMapper.writeValueAsString(dto);
                     } catch (Exception e) {
                         throw new RuntimeException("Error serializing result", e);
                     }
@@ -116,9 +134,10 @@ public class PortfolioMcpServer {
     @Tool(description = "Get active portfolio summary with key metrics (only positions with shares > 0).")
     public Uni<String> getActivePortfolioSummary() {
         return getPortfolioSummaryUseCase.getActiveSummary()
-                .map(summary -> {
+                .map(portfolioSummaryMcpMapper::toDto)
+                .map(dto -> {
                     try {
-                        return objectMapper.writeValueAsString(summary);
+                        return objectMapper.writeValueAsString(dto);
                     } catch (Exception e) {
                         throw new RuntimeException("Error serializing result", e);
                     }
@@ -131,20 +150,15 @@ public class PortfolioMcpServer {
     public Uni<String> getCurrentPrice(@ToolArg(description = "Stock ticker symbol (e.g., AAPL, MSFT)") String ticker,
                                        @ToolArg(description = "Exchange code for the symbol (e.g., BME, NYSE)", required = false) String exchangeCode) {
         return marketDataPriceFetchService.getCurrentPrice(ticker, exchangeCode)
-                .map(price -> {
+                .map(price -> marketPriceMcpMapper.toDto(ticker, price, LocalDateTime.now()))
+                .map(dto -> {
                     try {
-                        return objectMapper.writeValueAsString(
-                                new PriceResult(ticker, price, java.time.LocalDateTime.now())
-                        );
+                        return objectMapper.writeValueAsString(dto);
                     } catch (Exception e) {
                         throw new RuntimeException("Error serializing result", e);
                     }
                 })
                 .onFailure().invoke(e -> Log.error("Error getting current price for ticker {}", ticker, e))
                 .onFailure().transform(throwable -> new ToolCallException("Error getting current price for ticker " + ticker));
-    }
-
-    // Helper record for price response
-    private record PriceResult(String ticker, java.math.BigDecimal price, java.time.LocalDateTime timestamp) {
     }
 }
