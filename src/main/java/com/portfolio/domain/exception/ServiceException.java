@@ -1,5 +1,8 @@
 package com.portfolio.domain.exception;
 
+import lombok.Getter;
+
+@Getter
 public class ServiceException extends RuntimeException {
     private final Error error;
 
@@ -21,10 +24,6 @@ public class ServiceException extends RuntimeException {
     public ServiceException(Error error, String message, Throwable cause) {
         super(message, cause);
         this.error = error;
-    }
-
-    public Error getError() {
-        return error;
     }
 
     public String getErrorCode() {

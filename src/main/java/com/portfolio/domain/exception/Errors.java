@@ -2,6 +2,13 @@ package com.portfolio.domain.exception;
 
 public interface Errors {
 
+    interface Position {
+        String errorCode = "01";
+
+        Error INVALID_INPUT = new Error(errorCode + "01");
+        Error OVERSELL = new Error(errorCode + "02");
+    }
+
     interface GetPortfolioSummary {
         String errorCode = "10";
 
@@ -32,6 +39,7 @@ public interface Errors {
         Error INVALID_INPUT = new Error(errorCode + "01");
         Error PERSISTENCE_ERROR = new Error(errorCode + "02");
         Error CALCULATION_ERROR = new Error(errorCode + "03");
+        Error UNEXPECTED_ERROR = new Error(errorCode + "04");
     }
 
     interface MarketData {

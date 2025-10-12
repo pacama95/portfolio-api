@@ -3,12 +3,13 @@ package com.portfolio.infrastructure.stream.service;
 import com.portfolio.infrastructure.stream.config.RedisStreamConfig;
 import com.portfolio.infrastructure.stream.consumer.TransactionCreatedConsumer;
 import com.portfolio.infrastructure.stream.consumer.TransactionDeletedConsumer;
-import com.portfolio.infrastructure.stream.consumer.TransactionUpdatedConsumer;
 import io.quarkus.redis.datasource.ReactiveRedisDataSource;
 import io.quarkus.redis.datasource.stream.ReactiveStreamCommands;
 import io.quarkus.redis.datasource.stream.XGroupCreateArgs;
+import io.quarkus.runtime.ShutdownEvent;
 import io.quarkus.runtime.StartupEvent;
 import io.smallrye.mutiny.Uni;
+import io.smallrye.mutiny.subscription.Cancellable;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
 import jakarta.inject.Inject;
@@ -25,10 +26,9 @@ public class RedisStreamBootstrapService {
 
     private static final Logger log = LoggerFactory.getLogger(RedisStreamBootstrapService.class);
     public static final String TRANSACTION_DELETED_STREAM = "transaction:deleted";
-    public static final String TRANSACTION_UPDATED_STREAM = "transaction:updated";
     public static final String TRANSACTION_CREATED_STREAM = "transaction:created";
     private static final List<String> TRANSACTION_STREAMS =
-            List.of(TRANSACTION_CREATED_STREAM, TRANSACTION_UPDATED_STREAM, TRANSACTION_DELETED_STREAM);
+            List.of(TRANSACTION_CREATED_STREAM, TRANSACTION_DELETED_STREAM);
 
     @Inject
     ReactiveRedisDataSource redisDataSource;
@@ -40,10 +40,10 @@ public class RedisStreamBootstrapService {
     TransactionCreatedConsumer createdConsumer;
 
     @Inject
-    TransactionUpdatedConsumer updatedConsumer;
-
-    @Inject
     TransactionDeletedConsumer deletedConsumer;
+
+    private Cancellable transactionCreatedConsumer;
+    private Cancellable transactionDeletedConsumer;
 
     private ReactiveStreamCommands<String, String, String> streamCommands;
 
@@ -56,11 +56,25 @@ public class RedisStreamBootstrapService {
         streamCommands = redisDataSource.stream(String.class, String.class, String.class);
 
         initializeStreamsAndConsumerGroup()
-                .onItem().transformToUni(ignored -> startAllConsumers())
                 .subscribe().with(
-                        ignored -> log.info("Redis Stream bootstrap completed successfully"),
-                        throwable -> log.error("Redis Stream bootstrap failed", throwable)
+                        result -> {
+                            log.info("Consumer group {} ready", config.group());
+                            startAllConsumers();
+                        },
+                        failure -> log.error("Failed to initialize consumer group", failure)
                 );
+    }
+
+    void onStop(@Observes ShutdownEvent ev) {
+        log.info("Stopping Redis Stream bootstrap process");
+
+        if (transactionCreatedConsumer != null) {
+            transactionCreatedConsumer.cancel();
+        }
+
+        if (transactionDeletedConsumer != null) {
+            transactionDeletedConsumer.cancel();
+        }
     }
 
     /**
@@ -113,20 +127,10 @@ public class RedisStreamBootstrapService {
     /**
      * Start all consumers
      */
-    private Uni<Void> startAllConsumers() {
+    private void startAllConsumers() {
         log.info("Starting all Redis Stream consumers");
 
-        return Uni.join().all(
-                        createdConsumer.startConsuming(),
-                        updatedConsumer.startConsuming(),
-                        deletedConsumer.startConsuming()
-                ).andFailFast()
-                .onItem().transform(results -> {
-                    log.info("All Redis Stream consumers started successfully");
-                    return (Void) null;
-                })
-                .onFailure().invoke(throwable ->
-                        log.error("Failed to start Redis Stream consumers", throwable))
-                .onFailure().recoverWithItem((Void) null);
+        transactionCreatedConsumer = createdConsumer.startConsuming();
+        transactionDeletedConsumer = deletedConsumer.startConsuming();
     }
 }

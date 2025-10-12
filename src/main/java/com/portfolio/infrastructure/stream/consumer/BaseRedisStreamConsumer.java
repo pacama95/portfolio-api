@@ -1,8 +1,12 @@
 package com.portfolio.infrastructure.stream.consumer;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.portfolio.infrastructure.stream.config.ProcessingConfig;
 import com.portfolio.infrastructure.stream.config.RedisStreamConfig;
 import com.portfolio.infrastructure.stream.dto.EventEnvelope;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
 import io.quarkus.redis.datasource.ReactiveRedisDataSource;
 import io.quarkus.redis.datasource.stream.ReactiveStreamCommands;
 import io.smallrye.mutiny.Uni;
@@ -19,6 +23,11 @@ public abstract class BaseRedisStreamConsumer {
 
     private static final Logger log = LoggerFactory.getLogger(BaseRedisStreamConsumer.class);
 
+    // Metrics
+    protected Counter processedCounter;
+    protected Counter errorCounter;
+    protected Timer processingTimer;
+
     @Inject
     protected ReactiveRedisDataSource redisDataSource;
 
@@ -26,7 +35,13 @@ public abstract class BaseRedisStreamConsumer {
     protected RedisStreamConfig config;
 
     @Inject
+    protected ProcessingConfig processingConfig;
+
+    @Inject
     protected ObjectMapper objectMapper;
+
+    @Inject
+    MeterRegistry meterRegistry;
 
     protected ReactiveStreamCommands<String, String, String> streamCommands;
 
@@ -37,15 +52,25 @@ public abstract class BaseRedisStreamConsumer {
         this.streamCommands = redisDataSource.stream(String.class, String.class, String.class);
     }
 
+    protected void initializeMetrics(String streamName) {
+        this.processedCounter = Counter.builder("redis.stream.processed")
+                .description("Number of messages processed")
+                .tag("stream", streamName)
+                .register(meterRegistry);
+        this.errorCounter = Counter.builder("redis.stream.errors")
+                .description("Number of errors processing messages")
+                .tag("stream", streamName)
+                .register(meterRegistry);
+        this.processingTimer = Timer.builder("redis.stream.processing")
+                .description("Time taken to process messages")
+                .tag("stream", streamName)
+                .register(meterRegistry);
+    }
+
     /**
      * Get the stream name this consumer handles
      */
     protected abstract String getStreamName();
-
-    /**
-     * Process a single event
-     */
-    protected abstract Uni<Void> processEvent(EventEnvelope envelope, String messageId);
 
     /**
      * Parse the Redis Stream message into an EventEnvelope

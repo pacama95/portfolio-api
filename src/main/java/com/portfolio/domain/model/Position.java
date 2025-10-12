@@ -1,11 +1,15 @@
 package com.portfolio.domain.model;
 
+import com.portfolio.domain.exception.Errors;
+import com.portfolio.domain.exception.ServiceException;
 import lombok.Getter;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -22,11 +26,12 @@ public class Position {
     private BigDecimal totalTransactionFees;
     private final Currency currency;
     private LocalDate lastUpdated;
-    private LocalDate firstPurchaseDate;
+    private final LocalDate firstPurchaseDate;
     private Boolean isActive;
     private Instant lastEventAppliedAt; // For event ordering and idempotency
     private String exchange;
     private String country;
+    private final List<UUID> transactions;
 
     // Constructor with required fields for creating new positions
     public Position(String ticker, Currency currency) {
@@ -39,6 +44,7 @@ public class Position {
         this.totalInvestedAmount = BigDecimal.ZERO;
         this.totalTransactionFees = BigDecimal.ZERO;
         this.firstPurchaseDate = LocalDate.now();
+        this.transactions = new ArrayList<>();
         this.isActive = true;
     }
 
@@ -56,7 +62,8 @@ public class Position {
                     Boolean isActive,
                     Instant lastEventAppliedAt,
                     String exchange,
-                    String country) {
+                    String country,
+                    List<UUID> transactions) {
         this.id = id;
         this.ticker = ticker;
         this.sharesOwned = sharesOwned;
@@ -71,49 +78,46 @@ public class Position {
         this.lastEventAppliedAt = lastEventAppliedAt;
         this.exchange = exchange;
         this.country = country;
+        this.transactions = transactions;
     }
 
-    /**
-     * Checks if the position has any shares
-     */
     public boolean hasShares() {
         return sharesOwned != null && sharesOwned.compareTo(BigDecimal.ZERO) > 0;
     }
 
-    /**
-     * Calculates the current market value
-     */
     public BigDecimal getTotalMarketValue() {
+        if (!hasShares()) {
+            return BigDecimal.ZERO;
+        }
+
         return sharesOwned.multiply(latestMarketPrice);
     }
 
-    /**
-     * Calculates the unrealized gain/loss
-     */
     public BigDecimal getUnrealizedGainLoss() {
+        if (!hasShares()) {
+            return BigDecimal.ZERO;
+        }
+
         return getTotalMarketValue().subtract(totalInvestedAmount);
     }
 
-    /**
-     * Calculates the unrealized gain/loss percentage
-     */
     public BigDecimal getUnrealizedGainLossPercentage() {
-        if (totalInvestedAmount == null || totalInvestedAmount.compareTo(BigDecimal.ZERO) == 0) {
+        if (!hasShares()) {
+            return BigDecimal.ZERO;
+        }
+
+        if (totalInvestedAmount == null || totalInvestedAmount.compareTo(BigDecimal.ZERO) <= 0) {
             return BigDecimal.ZERO;
         }
         return getUnrealizedGainLoss().divide(totalInvestedAmount, 6, RoundingMode.HALF_UP).multiply(BigDecimal.valueOf(100));
     }
 
-    /**
-     * Apply a BUY transaction to this position
-     * Updates shares owned, average cost, and total invested amount
-     */
     public void applyBuy(BigDecimal quantity, BigDecimal price, BigDecimal fees) {
         if (quantity == null || quantity.compareTo(BigDecimal.ZERO) <= 0) {
-            throw new IllegalArgumentException("Quantity must be positive");
+            throw new ServiceException(Errors.Position.INVALID_INPUT, "Quantity must be positive");
         }
         if (price == null || price.compareTo(BigDecimal.ZERO) < 0) {
-            throw new IllegalArgumentException("Price cannot be negative");
+            throw new ServiceException(Errors.Position.INVALID_INPUT, "Price cannot be negative");
         }
         if (fees == null) {
             fees = BigDecimal.ZERO;
@@ -143,37 +147,41 @@ public class Position {
         this.isActive = true;
     }
 
-    /**
-     * Apply a SELL transaction to this position
-     * Reduces shares owned, adjusts invested amount proportionally, and subtracts fees
-     */
     public void applySell(BigDecimal quantity, BigDecimal price, BigDecimal fees) {
         if (quantity == null || quantity.compareTo(BigDecimal.ZERO) <= 0) {
-            throw new IllegalArgumentException("Quantity must be positive");
+            throw new ServiceException(Errors.Position.INVALID_INPUT, "Quantity must be positive");
+        }
+        if (this.sharesOwned.compareTo(quantity) < 0) {
+            throw new ServiceException(Errors.Position.OVERSELL);
         }
         if (price == null || price.compareTo(BigDecimal.ZERO) < 0) {
-            throw new IllegalArgumentException("Price cannot be negative");
+            throw new ServiceException(Errors.Position.INVALID_INPUT, "Price cannot be negative");
         }
         if (fees == null) {
             fees = BigDecimal.ZERO;
         }
 
-        BigDecimal currentShares = this.sharesOwned != null ? this.sharesOwned : BigDecimal.ZERO;
         BigDecimal currentInvested = this.totalInvestedAmount != null ? this.totalInvestedAmount : BigDecimal.ZERO;
         BigDecimal averageCost = this.averageCostPerShare != null ? this.averageCostPerShare : BigDecimal.ZERO;
         BigDecimal currentFees = this.totalTransactionFees != null ? this.totalTransactionFees : BigDecimal.ZERO;
 
         // Calculate new shares after sale
-        BigDecimal newTotalShares = currentShares.subtract(quantity);
+        BigDecimal newTotalShares = this.sharesOwned.subtract(quantity);
 
         // Reduce invested amount proportionally based on average cost
         BigDecimal proportionalCost = quantity.multiply(averageCost);
-        BigDecimal newTotalInvested = currentInvested.subtract(proportionalCost).subtract(fees);
+        BigDecimal newTotalInvested = currentInvested.subtract(proportionalCost);
         BigDecimal totalTransactionFees = currentFees.add(fees);
 
+        // Calculate new average cost per share
+        BigDecimal newAverageCost = newTotalShares.compareTo(BigDecimal.ZERO) > 0
+                ? newTotalInvested.divide(newTotalShares, 6, RoundingMode.HALF_UP)
+                : BigDecimal.ZERO;
+
         // Update position state
-        this.sharesOwned = newTotalShares.max(BigDecimal.ZERO);  // Don't go negative
-        this.totalInvestedAmount = newTotalInvested.max(BigDecimal.ZERO);
+        this.sharesOwned = newTotalShares;
+        this.averageCostPerShare = newAverageCost;
+        this.totalInvestedAmount = (newTotalShares.compareTo(BigDecimal.ZERO) == 0) ? BigDecimal.ZERO : newTotalInvested;
         this.latestMarketPrice = price;
         this.totalTransactionFees = totalTransactionFees;
 
@@ -183,10 +191,7 @@ public class Position {
         }
     }
 
-    /**
-     * Apply a transaction based on its type
-     */
-    public void applyTransaction(String transactionType, BigDecimal quantity, BigDecimal price, BigDecimal fees) {
+    public void applyTransaction(UUID transactionId, String transactionType, BigDecimal quantity, BigDecimal price, BigDecimal fees) {
         if (transactionType == null) {
             throw new IllegalArgumentException("Transaction type cannot be null");
         }
@@ -197,32 +202,31 @@ public class Position {
             default -> throw new IllegalArgumentException("Unknown transaction type: " + transactionType);
         }
 
+        this.transactions.add(transactionId);
         this.lastUpdated = LocalDate.now();
     }
 
-    /**
-     * Reverse a BUY transaction
-     * Undoes everything that applyBuy did, including subtracting fees
-     */
     private void reverseBuy(BigDecimal quantity, BigDecimal price, BigDecimal fees) {
         if (quantity == null || quantity.compareTo(BigDecimal.ZERO) <= 0) {
-            throw new IllegalArgumentException("Quantity must be positive");
+            throw new ServiceException(Errors.Position.INVALID_INPUT, "Quantity must be positive");
+        }
+        if (this.sharesOwned.compareTo(quantity) < 0) {
+            throw new ServiceException(Errors.Position.OVERSELL);
         }
         if (price == null || price.compareTo(BigDecimal.ZERO) < 0) {
-            throw new IllegalArgumentException("Price cannot be negative");
+            throw new ServiceException(Errors.Position.INVALID_INPUT, "Price cannot be negative");
         }
         if (fees == null) {
             fees = BigDecimal.ZERO;
         }
 
-        BigDecimal currentShares = this.sharesOwned != null ? this.sharesOwned : BigDecimal.ZERO;
         BigDecimal currentInvested = this.totalInvestedAmount != null ? this.totalInvestedAmount : BigDecimal.ZERO;
         BigDecimal currentFees = this.totalTransactionFees != null ? this.totalTransactionFees : BigDecimal.ZERO;
 
         // Reverse the BUY: remove shares, remove cost (including fees), and remove fees
         BigDecimal transactionCost = quantity.multiply(price).add(fees);
         BigDecimal newTotalInvested = currentInvested.subtract(transactionCost);
-        BigDecimal newTotalShares = currentShares.subtract(quantity);
+        BigDecimal newTotalShares = this.sharesOwned.subtract(quantity);
         BigDecimal totalTransactionFees = currentFees.subtract(fees);
 
         // Recalculate average cost per share
@@ -231,11 +235,11 @@ public class Position {
                 : BigDecimal.ZERO;
 
         // Update position state
-        this.sharesOwned = newTotalShares.max(BigDecimal.ZERO);
+        this.sharesOwned = newTotalShares;
         this.averageCostPerShare = newAverageCost;
-        this.totalInvestedAmount = newTotalInvested.max(BigDecimal.ZERO);
+        this.totalInvestedAmount = (newTotalShares.compareTo(BigDecimal.ZERO) == 0) ? BigDecimal.ZERO : newTotalInvested;
         this.latestMarketPrice = price;
-        this.totalTransactionFees = totalTransactionFees.max(BigDecimal.ZERO);
+        this.totalTransactionFees = totalTransactionFees;
 
         // Mark as inactive if no shares left
         if (newTotalShares.compareTo(BigDecimal.ZERO) <= 0) {
@@ -243,16 +247,12 @@ public class Position {
         }
     }
 
-    /**
-     * Reverse a SELL transaction
-     * Undoes everything that applySell did, including subtracting fees
-     */
     private void reverseSell(BigDecimal quantity, BigDecimal price, BigDecimal fees) {
         if (quantity == null || quantity.compareTo(BigDecimal.ZERO) <= 0) {
-            throw new IllegalArgumentException("Quantity must be positive");
+            throw new ServiceException(Errors.Position.INVALID_INPUT, "Quantity must be positive");
         }
         if (price == null || price.compareTo(BigDecimal.ZERO) < 0) {
-            throw new IllegalArgumentException("Price cannot be negative");
+            throw new ServiceException(Errors.Position.INVALID_INPUT, "Price cannot be negative");
         }
         if (fees == null) {
             fees = BigDecimal.ZERO;
@@ -266,7 +266,7 @@ public class Position {
         // Reverse the SELL: add shares back, add cost back (plus fees that were subtracted), and remove fees
         BigDecimal newTotalShares = currentShares.add(quantity);
         BigDecimal proportionalCost = quantity.multiply(averageCost);
-        BigDecimal newTotalInvested = currentInvested.add(proportionalCost).add(fees);
+        BigDecimal newTotalInvested = currentInvested.add(proportionalCost);
         BigDecimal totalTransactionFees = currentFees.subtract(fees);
 
         // Recalculate average cost per share
@@ -279,15 +279,11 @@ public class Position {
         this.averageCostPerShare = newAverageCost;
         this.totalInvestedAmount = newTotalInvested;
         this.latestMarketPrice = price;
-        this.totalTransactionFees = totalTransactionFees.max(BigDecimal.ZERO);
+        this.totalTransactionFees = totalTransactionFees;
         this.isActive = true;
     }
 
-    /**
-     * Reverse a transaction based on its type
-     * Properly undoes all effects including fees
-     */
-    public void reverseTransaction(String transactionType, BigDecimal quantity, BigDecimal price, BigDecimal fees) {
+    public void reverseTransaction(UUID transactionId, String transactionType, BigDecimal quantity, BigDecimal price, BigDecimal fees) {
         if (transactionType == null) {
             throw new IllegalArgumentException("Transaction type cannot be null");
         }
@@ -298,42 +294,28 @@ public class Position {
             default -> throw new IllegalArgumentException("Unknown transaction type: " + transactionType);
         }
 
+        this.transactions.remove(transactionId);
         this.lastUpdated = LocalDate.now();
     }
 
-    /**
-     * Mark this position as inactive (soft delete)
-     */
     public void markAsInactive() {
         this.isActive = false;
         this.lastUpdated = LocalDate.now();
     }
 
-    /**
-     * Update the event applied timestamp for idempotency
-     */
     public void updateLastEventAppliedAt(Instant timestamp) {
         this.lastEventAppliedAt = timestamp;
     }
 
-    /**
-     * Check if an event should be ignored based on timestamp ordering
-     */
     public boolean shouldIgnoreEvent(Instant eventOccurredAt) {
         return this.lastEventAppliedAt != null &&
                 !eventOccurredAt.isAfter(this.lastEventAppliedAt);
     }
 
-    /**
-     * Update exchange information
-     */
     public void updateExchange(String exchange) {
         this.exchange = exchange;
     }
 
-    /**
-     * Update country information
-     */
     public void updateCountry(String country) {
         this.country = country;
     }

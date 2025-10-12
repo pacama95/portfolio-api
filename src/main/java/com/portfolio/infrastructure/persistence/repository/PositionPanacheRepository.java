@@ -6,6 +6,7 @@ import io.quarkus.hibernate.reactive.panache.common.WithSession;
 import io.quarkus.hibernate.reactive.panache.common.WithTransaction;
 import io.smallrye.mutiny.Uni;
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.persistence.LockModeType;
 
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
@@ -25,7 +26,16 @@ public class PositionPanacheRepository implements PanacheRepository<PositionEnti
 
     @WithSession
     public Uni<PositionEntity> findByTicker(String ticker) {
-        return find("ticker = ?1", ticker).firstResult();
+        return find("ticker = ?1", ticker)
+                .withLock(LockModeType.PESSIMISTIC_WRITE)
+                .firstResult();
+    }
+
+    @WithSession
+    public Uni<PositionEntity> findByTickerWithTransactions(String ticker) {
+        return find("SELECT p FROM PositionEntity p JOIN FETCH p.transactions WHERE p.ticker = ?1", ticker)
+                .withLock(LockModeType.PESSIMISTIC_WRITE)
+                .firstResult();
     }
 
     @WithSession
@@ -74,16 +84,6 @@ public class PositionPanacheRepository implements PanacheRepository<PositionEnti
 
     @WithTransaction
     public Uni<PositionEntity> save(PositionEntity position) {
-        return persistAndFlush(position);
-    }
-
-    public Uni<PositionEntity> update(PositionEntity position) {
-        // Calculate derived fields
-        if (position.getLatestMarketPrice() != null && position.getSharesOwned() != null) {
-            BigDecimal marketValue = position.getSharesOwned().multiply(position.getLatestMarketPrice());
-            position.setTotalMarketValue(marketValue);
-            position.setUnrealizedGainLoss(marketValue.subtract(position.getTotalInvestedAmount()));
-        }
         return persistAndFlush(position);
     }
 } 

@@ -1,6 +1,7 @@
 package com.portfolio.infrastructure.persistence.entity;
 
 import com.portfolio.domain.model.Currency;
+import com.portfolio.domain.model.Position;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
@@ -9,6 +10,8 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -79,6 +82,14 @@ public class PositionEntity {
     @Column(name = "country", length = 100)
     private String country;
 
+    @OneToMany(
+            mappedBy = "position",
+            cascade = CascadeType.ALL,
+            orphanRemoval = true,
+            fetch = FetchType.LAZY
+    )
+    private List<PositionTransactionEntity> transactions = new ArrayList<>();
+
     // Default constructor
     public PositionEntity() {
     }
@@ -93,4 +104,50 @@ public class PositionEntity {
     protected void onUpdate() {
         updatedAt = OffsetDateTime.now();
     }
-} 
+
+    public void addTransaction(PositionTransactionEntity tx) {
+        tx.setPosition(this);
+        this.transactions.add(tx);
+    }
+
+    public void removeTransaction(PositionTransactionEntity tx) {
+        tx.setPosition(null);
+        this.transactions.remove(tx);
+    }
+
+    public void update(Position position) {
+        this.ticker = position.getTicker();
+        this.sharesOwned = position.getSharesOwned();
+        this.averageCostPerShare = position.getAverageCostPerShare();
+        this.currency = position.getCurrency();
+        this.totalInvestedAmount = position.getTotalInvestedAmount();
+        this.totalTransactionFees = position.getTotalTransactionFees();
+        this.firstPurchaseDate = position.getFirstPurchaseDate();
+        this.unrealizedGainLoss = position.getUnrealizedGainLoss();
+        this.totalMarketValue = position.getTotalMarketValue();
+        this.latestMarketPrice = position.getLatestMarketPrice();
+        this.lastEventAppliedAt = position.getLastEventAppliedAt();
+        this.exchange = position.getExchange();
+        this.country = position.getCountry();
+
+        // Synchronize transactions collection
+        List<UUID> domainTransactionIds = position.getTransactions();
+
+        // Remove transactions that are no longer in the domain model
+        this.transactions.removeIf(txEntity ->
+                !domainTransactionIds.contains(txEntity.getTransactionId())
+        );
+
+        // Add new transactions from domain model that aren't in the entity yet
+        List<UUID> existingTransactionIds = this.transactions.stream()
+                .map(PositionTransactionEntity::getTransactionId)
+                .toList();
+
+        for (UUID transactionId : domainTransactionIds) {
+            if (!existingTransactionIds.contains(transactionId)) {
+                PositionTransactionEntity newTx = new PositionTransactionEntity(this, transactionId);
+                this.transactions.add(newTx);
+            }
+        }
+    }
+}

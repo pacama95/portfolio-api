@@ -1,11 +1,13 @@
 package com.portfolio.application.usecase.transaction;
 
 import com.portfolio.domain.exception.Errors;
+import com.portfolio.domain.model.Position;
 import com.portfolio.domain.port.PositionRepository;
 import com.portfolio.domain.usecase.ProcessTransactionDeletedUseCase;
 import io.quarkus.hibernate.reactive.panache.common.WithTransaction;
 import io.smallrye.mutiny.Uni;
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.persistence.PersistenceException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -30,47 +32,69 @@ public class ProcessTransactionDeletedService implements ProcessTransactionDelet
         log.info("Processing transaction deleted (rollback): transactionId={}, ticker={}, type={}, quantity={}, occurredAt={}",
                 command.transactionId(), command.ticker(), command.transactionType(), command.quantity(), command.occurredAt());
 
-        return positionRepository.findByTicker(command.ticker())
-                .flatMap(existingPosition -> {
-                    if (existingPosition == null) {
-                        log.warn("Position not found for deleted transaction: ticker={}, cannot rollback", command.ticker());
-                        return Uni.createFrom().item(new Result.Ignored(
-                                "Position not found for ticker, nothing to rollback"
-                        ));
+        return positionRepository.findByTickerForUpdate(command.ticker())
+                .flatMap(position -> {
+                    if (position == null) {
+                        return Uni.createFrom().item(
+                                () -> new Result.Replay("Position not found for ticker", command.transactionId(), null));
                     }
 
-                    // Check if event is out of order
-                    if (existingPosition.shouldIgnoreEvent(command.occurredAt())) {
-                        log.info("Ignoring out-of-order deleted event for ticker={}, eventTime={}, lastAppliedTime={}",
-                                command.ticker(), command.occurredAt(), existingPosition.getLastEventAppliedAt());
-                        return Uni.createFrom().item(new Result.Ignored(
-                                "Event is older than last applied event"
-                        ));
-                    }
+                    return isProcessedTransaction(command, position)
+                            .flatMap(processed -> {
+                                if (processed) {
+                                    return processTransaction(position, command);
+                                }
+                                log.info("The transaction does not exist for this position (yet): transactionId={}, ticker={}",
+                                        command.transactionId(), command.ticker());
 
-                    // Rollback: reverse the transaction to undo its effects
-                    log.info("Reversing transaction: type={}, quantity={}, price={}, fees={} for ticker={}",
-                            command.transactionType(), command.quantity(), command.price(), command.fees(), command.ticker());
-                    
-                    existingPosition.reverseTransaction(
-                            command.transactionType(),
-                            command.quantity(),
-                            command.price(),
-                            command.fees()
-                    );
-                    existingPosition.updateLastEventAppliedAt(command.occurredAt());
-
-                    log.info("Transaction reversed successfully. Position {} now has {} shares, invested amount: {}",
-                            command.ticker(), existingPosition.getSharesOwned(), existingPosition.getTotalInvestedAmount());
-
-                    return positionRepository.update(existingPosition).map(saved -> (Result) new Result.Success(saved));
+                                return Uni.createFrom().item(
+                                        () -> new Result.Replay("Transaction has not been processed yet", command.transactionId(), position.getId()));
+                            });
                 })
+                .onFailure(PersistenceException.class).retry().atMost(3)
                 .onFailure().recoverWithItem(throwable -> {
                     log.error("Error processing transaction deleted event: {}", command.transactionId(), throwable);
-                    return (Result) new Result.Error(
+                    return new Result.Error(
                             Errors.ProcessTransactionEvent.PERSISTENCE_ERROR,
                             "Failed to process transaction deleted event: " + throwable.getMessage()
                     );
                 });
+    }
+
+    private Uni<Boolean> isProcessedTransaction(Command command, Position position) {
+        return position != null ? positionRepository.isTransactionProcessed(position.getId(), command.transactionId()) : Uni.createFrom().item(false);
+    }
+
+    private Uni<Result> processTransaction(Position existingPosition, Command command) {
+        return applyTransaction(existingPosition, command)
+                .flatMap(position -> positionRepository.updatePositionWithTransactions(position).map(saved -> (Result) new Result.Success(saved)))
+                .onFailure().recoverWithItem(throwable -> {
+                    log.error("Error processing transaction deleted event: {}", command.transactionId(), throwable);
+                    return new Result.Error(
+                            Errors.ProcessTransactionEvent.PERSISTENCE_ERROR,
+                            "Failed to process transaction deleted event: " + throwable.getMessage()
+                    );
+                });
+    }
+
+    private Uni<Position> applyTransaction(Position existingPosition, Command command) {
+        return Uni.createFrom().item(() -> {
+            log.info("Reversing transaction: type={}, quantity={}, price={}, fees={} for ticker={}",
+                    command.transactionType(), command.quantity(), command.price(), command.fees(), command.ticker());
+
+            existingPosition.reverseTransaction(
+                    command.transactionId(),
+                    command.transactionType(),
+                    command.quantity(),
+                    command.price(),
+                    command.fees()
+            );
+            existingPosition.updateLastEventAppliedAt(command.occurredAt());
+
+            log.info("Transaction reversed successfully. Position {} now has {} shares, invested amount: {}",
+                    command.ticker(), existingPosition.getSharesOwned(), existingPosition.getTotalInvestedAmount());
+
+            return existingPosition;
+        });
     }
 }

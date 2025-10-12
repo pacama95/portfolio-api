@@ -40,7 +40,8 @@ class PositionMcpMapperTest {
                 true,
                 null,
                 "NASDAQ",
-                "United States"
+                "United States",
+                List.of()
         );
 
         // When
@@ -100,7 +101,8 @@ class PositionMcpMapperTest {
                 true,
                 null,
                 "NYSE",
-                "United States"
+                "United States",
+                List.of()
         );
 
         // Create CurrentPosition with fallback timestamp (stale data)
@@ -280,7 +282,8 @@ class PositionMcpMapperTest {
                 false,
                 null,
                 "XETRA",
-                "Germany"
+                "Germany",
+                List.of()
         );
 
         CurrentPosition currentPosition = new CurrentPosition(originalPosition, new BigDecimal("250.75"));
@@ -380,7 +383,8 @@ class PositionMcpMapperTest {
                 true,
                 null,
                 "NASDAQ",
-                "United States"
+                "United States",
+                List.of()
         );
     }
 }

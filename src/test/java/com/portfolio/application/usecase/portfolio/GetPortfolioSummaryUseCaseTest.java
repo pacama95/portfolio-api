@@ -5,21 +5,23 @@ import com.portfolio.domain.exception.Errors;
 import com.portfolio.domain.exception.ServiceException;
 import com.portfolio.domain.model.Currency;
 import com.portfolio.domain.model.CurrentPosition;
-import com.portfolio.domain.model.Position;
 import com.portfolio.domain.model.PortfolioSummary;
+import com.portfolio.domain.model.Position;
 import io.smallrye.mutiny.Uni;
 import io.smallrye.mutiny.helpers.test.UniAssertSubscriber;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.Mockito.*;
 
 class GetPortfolioSummaryUseCaseTest {
@@ -41,8 +43,8 @@ class GetPortfolioSummaryUseCaseTest {
         // When
         Uni<PortfolioSummary> uni = portfolioSummaryUseCase.getPortfolioSummary();
         PortfolioSummary summary = uni.subscribe().withSubscriber(UniAssertSubscriber.create())
-            .assertCompleted()
-            .getItem();
+                .assertCompleted()
+                .getItem();
 
         // Then
         assertNotNull(summary);
@@ -60,15 +62,15 @@ class GetPortfolioSummaryUseCaseTest {
         // Given
         CurrentPosition position1 = createCurrentPosition("AAPL", new BigDecimal("175.50"), true);
         CurrentPosition position2 = createCurrentPosition("MSFT", new BigDecimal("300.25"), false);
-        
+
         List<CurrentPosition> positions = List.of(position1, position2);
         when(getPositionUseCase.getAll()).thenReturn(Uni.createFrom().item(positions));
 
         // When
         Uni<PortfolioSummary> uni = portfolioSummaryUseCase.getPortfolioSummary();
         PortfolioSummary summary = uni.subscribe().withSubscriber(UniAssertSubscriber.create())
-            .assertCompleted()
-            .getItem();
+                .assertCompleted()
+                .getItem();
 
         // Then
         assertNotNull(summary);
@@ -90,20 +92,20 @@ class GetPortfolioSummaryUseCaseTest {
         // Given
         CurrentPosition position1 = createCurrentPosition("AAPL", new BigDecimal("180.00"), true);
         position1.setCurrentPriceTimestamp(LocalDateTime.now()); // Fresh real-time data
-        
+
         CurrentPosition position2 = createCurrentPosition("GOOGL", new BigDecimal("2600.00"), true);
         position2.setSharesOwned(new BigDecimal("10"));
         position2.setTotalInvestedAmount(new BigDecimal("25000.00"));
         position2.setCurrentPriceTimestamp(LocalDateTime.now()); // Fresh real-time data
-        
+
         List<CurrentPosition> positions = List.of(position1, position2);
         when(getPositionUseCase.getAll()).thenReturn(Uni.createFrom().item(positions));
 
         // When
         Uni<PortfolioSummary> uni = portfolioSummaryUseCase.getPortfolioSummary();
         PortfolioSummary summary = uni.subscribe().withSubscriber(UniAssertSubscriber.create())
-            .assertCompleted()
-            .getItem();
+                .assertCompleted()
+                .getItem();
 
         // Then
         assertNotNull(summary);
@@ -129,8 +131,8 @@ class GetPortfolioSummaryUseCaseTest {
         // When
         Uni<PortfolioSummary> uni = portfolioSummaryUseCase.getActiveSummary();
         PortfolioSummary summary = uni.subscribe().withSubscriber(UniAssertSubscriber.create())
-            .assertCompleted()
-            .getItem();
+                .assertCompleted()
+                .getItem();
 
         // Then
         assertNotNull(summary);
@@ -151,18 +153,18 @@ class GetPortfolioSummaryUseCaseTest {
         // Given
         CurrentPosition freshPosition = createCurrentPosition("AAPL", new BigDecimal("175.50"), true);
         freshPosition.setCurrentPriceTimestamp(LocalDateTime.now()); // Fresh data
-        
+
         CurrentPosition stalePosition = createCurrentPosition("MSFT", new BigDecimal("295.00"), true);
         stalePosition.setCurrentPriceTimestamp(LocalDateTime.now().minusHours(2)); // Stale fallback data
-        
+
         List<CurrentPosition> positions = List.of(freshPosition, stalePosition);
         when(getPositionUseCase.getActivePositions()).thenReturn(Uni.createFrom().item(positions));
 
         // When
         Uni<PortfolioSummary> uni = portfolioSummaryUseCase.getActiveSummary();
         PortfolioSummary summary = uni.subscribe().withSubscriber(UniAssertSubscriber.create())
-            .assertCompleted()
-            .getItem();
+                .assertCompleted()
+                .getItem();
 
         // Then
         assertNotNull(summary);
@@ -180,18 +182,18 @@ class GetPortfolioSummaryUseCaseTest {
         // Given
         CurrentPosition positionWithNullCost = createCurrentPosition("NVDA", new BigDecimal("450.00"), true);
         positionWithNullCost.setTotalInvestedAmount(null);
-        
+
         CurrentPosition positionWithNullMarketValue = createCurrentPosition("AMD", new BigDecimal("100.00"), false);
         positionWithNullMarketValue.setSharesOwned(null);
-        
+
         List<CurrentPosition> positions = List.of(positionWithNullCost, positionWithNullMarketValue);
         when(getPositionUseCase.getAll()).thenReturn(Uni.createFrom().item(positions));
 
         // When
         Uni<PortfolioSummary> uni = portfolioSummaryUseCase.getPortfolioSummary();
         PortfolioSummary summary = uni.subscribe().withSubscriber(UniAssertSubscriber.create())
-            .assertCompleted()
-            .getItem();
+                .assertCompleted()
+                .getItem();
 
         // Then
         assertNotNull(summary);
@@ -242,20 +244,21 @@ class GetPortfolioSummaryUseCaseTest {
 
     private CurrentPosition createCurrentPosition(String ticker, BigDecimal currentPrice, boolean hasShares) {
         Position originalPosition = new Position(
-            UUID.randomUUID(),
-            ticker,
-            hasShares ? new BigDecimal("100") : BigDecimal.ZERO,
-            new BigDecimal("150.00"),
-            new BigDecimal("160.00"), // Stored price (fallback)
-            new BigDecimal("15000.00"),
-            BigDecimal.ZERO,
-            Currency.USD,
-            LocalDate.now().minusDays(1),
-            LocalDate.now().minusDays(10),
-            true,
-            null,
-            null,
-            null
+                UUID.randomUUID(),
+                ticker,
+                hasShares ? new BigDecimal("100") : BigDecimal.ZERO,
+                new BigDecimal("150.00"),
+                new BigDecimal("160.00"), // Stored price (fallback)
+                new BigDecimal("15000.00"),
+                BigDecimal.ZERO,
+                Currency.USD,
+                LocalDate.now().minusDays(1),
+                LocalDate.now().minusDays(10),
+                true,
+                Instant.now(),
+                null,
+                null,
+                List.of()
         );
 
         // Create CurrentPosition with real-time price

@@ -11,6 +11,7 @@ import org.junit.jupiter.params.provider.MethodSource;
 import org.mapstruct.factory.Mappers;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -25,20 +26,21 @@ class PositionMapperTest {
     @Test
     void testToResponse_normalizesFields() {
         Position pos = new Position(
-            UUID.randomUUID(),
-            "GOOG",
-            new BigDecimal("10.1234567"),
-            new BigDecimal("100.987654"),
-            new BigDecimal("101.234567"),
-            new BigDecimal("1010.987654"),
-            BigDecimal.ZERO,
-            Currency.USD,
-            LocalDate.of(2024, 3, 3),
-            LocalDate.of(2024, 2, 1),
-            true,
-            null,
-            null,
-            null
+                UUID.randomUUID(),
+                "GOOG",
+                new BigDecimal("10.1234567"),
+                new BigDecimal("100.987654"),
+                new BigDecimal("101.234567"),
+                new BigDecimal("1010.987654"),
+                BigDecimal.ZERO,
+                Currency.USD,
+                LocalDate.of(2024, 3, 3),
+                LocalDate.of(2024, 2, 1),
+                true,
+                Instant.now(),
+                null,
+                null,
+                List.of()
         );
 
         PositionResponse resp = mapper.toResponse(pos);
@@ -53,10 +55,10 @@ class PositionMapperTest {
     void testCurrentPositionToResponse_withRealTimePrice() {
         // Given
         CurrentPosition currentPosition = createTestCurrentPosition("AAPL", new BigDecimal("175.50"));
-        
+
         // When
         PositionResponse response = mapper.toResponse(currentPosition);
-        
+
         // Then
         assertNotNull(response);
         assertEquals(currentPosition.getId(), response.id());
@@ -67,7 +69,7 @@ class PositionMapperTest {
         assertEquals(new BigDecimal("15000.0000"), response.totalCost()); // Normalized to scale 4
         assertEquals(Currency.USD, response.currency());
         assertTrue(response.isActive());
-        
+
         // Market value should be calculated with real-time price: 100 * 175.50 = 17550
         assertEquals(new BigDecimal("17550.0000"), response.marketValue());
         // Unrealized gain/loss: 17550 - 15000 = 2550
@@ -80,32 +82,33 @@ class PositionMapperTest {
     void testCurrentPositionToResponse_withFallbackPrice() {
         // Given
         Position originalPosition = new Position(
-            UUID.randomUUID(),
-            "MSFT",
-            new BigDecimal("100"),
-            new BigDecimal("150.00"),
-            new BigDecimal("300.25"),
-            new BigDecimal("15000.00"),
-            BigDecimal.ZERO,
-            Currency.USD,
-            LocalDate.now().minusDays(1),
-            LocalDate.now().minusDays(10),
-            true,
-            null,
-            null,
-            null
+                UUID.randomUUID(),
+                "MSFT",
+                new BigDecimal("100"),
+                new BigDecimal("150.00"),
+                new BigDecimal("300.25"),
+                new BigDecimal("15000.00"),
+                BigDecimal.ZERO,
+                Currency.USD,
+                LocalDate.now().minusDays(1),
+                LocalDate.now().minusDays(10),
+                true,
+                Instant.now(),
+                null,
+                null,
+                List.of()
         );
-        
+
         // Create CurrentPosition with fallback timestamp (stale data)
         CurrentPosition currentPosition = new CurrentPosition(
-            originalPosition, 
-            new BigDecimal("300.25"), 
-            LocalDateTime.now().minusHours(2)
+                originalPosition,
+                new BigDecimal("300.25"),
+                LocalDateTime.now().minusHours(2)
         );
-        
+
         // When
         PositionResponse response = mapper.toResponse(currentPosition);
-        
+
         // Then
         assertNotNull(response);
         assertEquals("MSFT", response.ticker());
@@ -121,22 +124,22 @@ class PositionMapperTest {
         CurrentPosition position2 = createTestCurrentPosition("GOOGL", new BigDecimal("2650.75"));
         position2.setSharesOwned(new BigDecimal("10"));
         position2.setTotalInvestedAmount(new BigDecimal("25000.00"));
-        
+
         List<CurrentPosition> positions = List.of(position1, position2);
-        
+
         // When
         List<PositionResponse> responses = mapper.toCurrentPositionResponses(positions);
-        
+
         // Then
         assertNotNull(responses);
         assertEquals(2, responses.size());
-        
+
         // First position
         PositionResponse response1 = responses.get(0);
         assertEquals("AAPL", response1.ticker());
         assertEquals(new BigDecimal("175.5000"), response1.currentPrice());
         assertEquals(new BigDecimal("17550.0000"), response1.marketValue());
-        
+
         // Second position
         PositionResponse response2 = responses.get(1);
         assertEquals("GOOGL", response2.ticker());
@@ -147,15 +150,15 @@ class PositionMapperTest {
 
     @ParameterizedTest
     @MethodSource("currentPositionFieldNormalizationData")
-    void testCurrentPositionFieldNormalization(BigDecimal inputQuantity, BigDecimal inputPrice, 
-                                              BigDecimal expectedQuantity, BigDecimal expectedPrice) {
+    void testCurrentPositionFieldNormalization(BigDecimal inputQuantity, BigDecimal inputPrice,
+                                               BigDecimal expectedQuantity, BigDecimal expectedPrice) {
         // Given
         CurrentPosition position = createTestCurrentPosition("TEST", inputPrice);
         position.setSharesOwned(inputQuantity);
-        
+
         // When
         PositionResponse response = mapper.toResponse(position);
-        
+
         // Then
         assertEquals(expectedQuantity, response.totalQuantity());
         assertEquals(expectedPrice, response.currentPrice());
@@ -163,27 +166,27 @@ class PositionMapperTest {
 
     static Stream<Arguments> currentPositionFieldNormalizationData() {
         return Stream.of(
-            // quantity with excessive precision, price with excessive precision
-            Arguments.of(
-                new BigDecimal("123.1234567890"), 
-                new BigDecimal("456.7890123456"),
-                new BigDecimal("123.123457"), // normalized to scale 6
-                new BigDecimal("456.7890")    // normalized to scale 4
-            ),
-            // zero values
-            Arguments.of(
-                BigDecimal.ZERO,
-                BigDecimal.ZERO,
-                new BigDecimal("0.000000"),
-                new BigDecimal("0.0000")
-            ),
-            // large numbers
-            Arguments.of(
-                new BigDecimal("999999.999999"),
-                new BigDecimal("999999.9999"),
-                new BigDecimal("999999.999999"),
-                new BigDecimal("999999.9999")
-            )
+                // quantity with excessive precision, price with excessive precision
+                Arguments.of(
+                        new BigDecimal("123.1234567890"),
+                        new BigDecimal("456.7890123456"),
+                        new BigDecimal("123.123457"), // normalized to scale 6
+                        new BigDecimal("456.7890")    // normalized to scale 4
+                ),
+                // zero values
+                Arguments.of(
+                        BigDecimal.ZERO,
+                        BigDecimal.ZERO,
+                        new BigDecimal("0.000000"),
+                        new BigDecimal("0.0000")
+                ),
+                // large numbers
+                Arguments.of(
+                        new BigDecimal("999999.999999"),
+                        new BigDecimal("999999.9999"),
+                        new BigDecimal("999999.999999"),
+                        new BigDecimal("999999.9999")
+                )
         );
     }
 
@@ -196,10 +199,10 @@ class PositionMapperTest {
         position.setCurrency(Currency.USD);
         position.setIsActive(true);
         // Leave all numeric fields as null
-        
+
         // When
         PositionResponse response = mapper.toResponse(position);
-        
+
         // Then
         assertNotNull(response);
         assertEquals("NULL_TEST", response.ticker());
@@ -219,10 +222,10 @@ class PositionMapperTest {
         CurrentPosition position = createTestCurrentPosition("CALC_TEST", new BigDecimal("200.00"));
         position.setSharesOwned(new BigDecimal("50"));
         position.setTotalInvestedAmount(new BigDecimal("7500.00")); // 50 * 150 average price
-        
+
         // When
         PositionResponse response = mapper.toResponse(position);
-        
+
         // Then
         // Market value: 50 * 200 = 10000
         assertEquals(new BigDecimal("10000.0000"), response.marketValue());
@@ -238,10 +241,10 @@ class PositionMapperTest {
         CurrentPosition position = createTestCurrentPosition("LOSS_TEST", new BigDecimal("120.00"));
         position.setSharesOwned(new BigDecimal("100"));
         position.setTotalInvestedAmount(new BigDecimal("15000.00")); // Higher than current market value
-        
+
         // When
         PositionResponse response = mapper.toResponse(position);
-        
+
         // Then
         // Market value: 100 * 120 = 12000
         assertEquals(new BigDecimal("12000.0000"), response.marketValue());
@@ -256,29 +259,30 @@ class PositionMapperTest {
         // Given
         UUID originalId = UUID.randomUUID();
         LocalDate lastUpdated = LocalDate.of(2024, 1, 15);
-        
+
         Position originalPosition = new Position(
-            originalId,
-            "PRESERVE_TEST",
-            new BigDecimal("100"),
-            new BigDecimal("150.00"),
-            new BigDecimal("160.00"),
-            new BigDecimal("15000.00"),
-            BigDecimal.ZERO,
-            Currency.EUR,
-            lastUpdated,
-            LocalDate.of(2024, 1, 1),
-            false,
-            null,
-            null,
-            null
+                originalId,
+                "PRESERVE_TEST",
+                new BigDecimal("100"),
+                new BigDecimal("150.00"),
+                new BigDecimal("160.00"),
+                new BigDecimal("15000.00"),
+                BigDecimal.ZERO,
+                Currency.EUR,
+                lastUpdated,
+                LocalDate.of(2024, 1, 1),
+                false,
+                Instant.now(),
+                null,
+                null,
+                List.of()
         );
-        
+
         CurrentPosition currentPosition = new CurrentPosition(originalPosition, new BigDecimal("250.75"));
-        
+
         // When
         PositionResponse response = mapper.toResponse(currentPosition);
-        
+
         // Then
         assertEquals(originalId, response.id());
         assertEquals(lastUpdated, response.lastUpdated());
@@ -291,10 +295,10 @@ class PositionMapperTest {
     void testCurrentPositionToResponse_emptyList() {
         // Given
         List<CurrentPosition> emptyList = List.of();
-        
+
         // When
         List<PositionResponse> responses = mapper.toCurrentPositionResponses(emptyList);
-        
+
         // Then
         assertNotNull(responses);
         assertTrue(responses.isEmpty());
@@ -307,20 +311,21 @@ class PositionMapperTest {
 
     private Position createTestPosition(String ticker) {
         return new Position(
-            UUID.randomUUID(),
-            ticker,
-            new BigDecimal("100"),
-            new BigDecimal("150.00"),
-            new BigDecimal("160.00"),
-            new BigDecimal("15000.00"),
-            BigDecimal.ZERO,
-            Currency.USD,
-            LocalDate.now().minusDays(1),
-            LocalDate.now().minusDays(10),
-            true,
-            null,
-            null,
-            null
+                UUID.randomUUID(),
+                ticker,
+                new BigDecimal("100"),
+                new BigDecimal("150.00"),
+                new BigDecimal("160.00"),
+                new BigDecimal("15000.00"),
+                BigDecimal.ZERO,
+                Currency.USD,
+                LocalDate.now().minusDays(1),
+                LocalDate.now().minusDays(10),
+                true,
+                Instant.now(),
+                null,
+                null,
+                List.of()
         );
     }
 } 

@@ -7,58 +7,31 @@ import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
 
-/**
- * Port interface for position persistence operations
- */
 public interface PositionRepository {
 
-    /**
-     * Finds a position by its ID
-     */
     Uni<Position> findById(UUID id);
 
-    /**
-     * Finds a position by ticker symbol
-     */
     Uni<Position> findByTicker(String ticker);
 
-    /**
-     * Finds all active positions (with shares > 0)
-     */
+    Uni<Position> findByTickerForUpdate(String ticker);
+
     Uni<List<Position>> findAllWithShares();
 
-    /**
-     * Finds all positions (including zero positions)
-     */
     Uni<List<Position>> findAll();
 
-    /**
-     * Updates market price for a specific ticker
-     */
     Uni<Position> updateMarketPrice(String ticker, BigDecimal newPrice);
 
-    /**
-     * Saves a new position
-     */
     Uni<Position> save(Position position);
 
-    /**
-     * Updates an existing position
-     */
     Uni<Position> update(Position position);
 
-    /**
-     * Checks if a position exists for a ticker
-     */
+    Uni<Position> updatePositionWithTransactions(Position position);
+
     Uni<Boolean> existsByTicker(String ticker);
 
-    /**
-     * Counts total number of positions
-     */
     Uni<Long> countAll();
-
-    /**
-     * Counts positions with shares > 0
-     */
+    
     Uni<Long> countWithShares();
+
+    Uni<Boolean> isTransactionProcessed(UUID positionId, UUID transactionId);
 } 

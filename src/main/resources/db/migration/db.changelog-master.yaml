@@ -15,3 +15,11 @@ databaseChangeLog:
             path: add-exchange-country-columns.sql
             relativeToChangelogFile: true
             splitStatements: true
+  - changeSet:
+      id: add-position-transactions
+      author: portfolio
+      changes:
+        - sqlFile:
+            path: add-position-transactions.sql
+            relativeToChangelogFile: true
+            splitStatements: true

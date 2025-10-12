@@ -16,6 +16,7 @@ import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.Collections;
 import java.util.List;
@@ -45,15 +46,15 @@ class GetPositionUseCaseTest {
         UUID id = UUID.randomUUID();
         Position position = createTestPosition("AAPL");
         BigDecimal realTimePrice = new BigDecimal("175.50");
-        
+
         when(positionRepository.findById(id)).thenReturn(Uni.createFrom().item(position));
         when(marketDataPriceFetchService.getCurrentPrice("AAPL", null)).thenReturn(Uni.createFrom().item(realTimePrice));
 
         // When
         Uni<CurrentPosition> uni = useCase.getById(id);
         CurrentPosition result = uni.subscribe().withSubscriber(UniAssertSubscriber.create())
-            .assertCompleted()
-            .getItem();
+                .assertCompleted()
+                .getItem();
 
         // Then
         assertNotNull(result);
@@ -70,15 +71,15 @@ class GetPositionUseCaseTest {
         UUID id = UUID.randomUUID();
         Position position = createTestPosition("AAPL");
         RuntimeException marketDataException = new RuntimeException("All market data providers failed");
-        
+
         when(positionRepository.findById(id)).thenReturn(Uni.createFrom().item(position));
         when(marketDataPriceFetchService.getCurrentPrice("AAPL", null)).thenReturn(Uni.createFrom().failure(marketDataException));
 
         // When
         Uni<CurrentPosition> uni = useCase.getById(id);
         CurrentPosition result = uni.subscribe().withSubscriber(UniAssertSubscriber.create())
-            .assertCompleted()
-            .getItem();
+                .assertCompleted()
+                .getItem();
 
         // Then
         assertNotNull(result);
@@ -95,15 +96,15 @@ class GetPositionUseCaseTest {
         UUID id = UUID.randomUUID();
         Position position = createTestPosition("MSFT");
         BigDecimal fetchedPrice = new BigDecimal("305.75");
-        
+
         when(positionRepository.findById(id)).thenReturn(Uni.createFrom().item(position));
         when(marketDataPriceFetchService.getCurrentPrice("MSFT", null)).thenReturn(Uni.createFrom().item(fetchedPrice));
 
         // When
         Uni<CurrentPosition> uni = useCase.getById(id);
         CurrentPosition result = uni.subscribe().withSubscriber(UniAssertSubscriber.create())
-            .assertCompleted()
-            .getItem();
+                .assertCompleted()
+                .getItem();
 
         // Then
         assertNotNull(result);
@@ -145,8 +146,8 @@ class GetPositionUseCaseTest {
         // When
         Uni<CurrentPosition> uni = useCase.getByTicker(ticker);
         CurrentPosition result = uni.subscribe().withSubscriber(UniAssertSubscriber.create())
-            .assertCompleted()
-            .getItem();
+                .assertCompleted()
+                .getItem();
 
         // Then
         assertNotNull(result);
@@ -162,15 +163,15 @@ class GetPositionUseCaseTest {
         String ticker = "GOOGL";
         Position position = createTestPosition(ticker);
         RuntimeException marketDataException = new RuntimeException("All market data providers failed");
-        
+
         when(positionRepository.findByTicker(ticker)).thenReturn(Uni.createFrom().item(position));
         when(marketDataPriceFetchService.getCurrentPrice(ticker, null)).thenReturn(Uni.createFrom().failure(marketDataException));
 
         // When
         Uni<CurrentPosition> uni = useCase.getByTicker(ticker);
         CurrentPosition result = uni.subscribe().withSubscriber(UniAssertSubscriber.create())
-            .assertCompleted()
-            .getItem();
+                .assertCompleted()
+                .getItem();
 
         // Then
         assertNotNull(result);
@@ -204,7 +205,7 @@ class GetPositionUseCaseTest {
         Position position1 = createTestPosition("AAPL");
         Position position2 = createTestPosition("MSFT");
         List<Position> positions = List.of(position1, position2);
-        
+
         when(positionRepository.findAll()).thenReturn(Uni.createFrom().item(positions));
         when(marketDataPriceFetchService.getCurrentPrice("AAPL", null)).thenReturn(Uni.createFrom().item(new BigDecimal("175.50")));
         when(marketDataPriceFetchService.getCurrentPrice("MSFT", null)).thenReturn(Uni.createFrom().item(new BigDecimal("300.25")));
@@ -212,8 +213,8 @@ class GetPositionUseCaseTest {
         // When
         Uni<List<CurrentPosition>> uni = useCase.getAll();
         List<CurrentPosition> result = uni.subscribe().withSubscriber(UniAssertSubscriber.create())
-            .assertCompleted()
-            .getItem();
+                .assertCompleted()
+                .getItem();
 
         // Then
         assertNotNull(result);
@@ -234,8 +235,8 @@ class GetPositionUseCaseTest {
         // When
         Uni<List<CurrentPosition>> uni = useCase.getAll();
         List<CurrentPosition> result = uni.subscribe().withSubscriber(UniAssertSubscriber.create())
-            .assertCompleted()
-            .getItem();
+                .assertCompleted()
+                .getItem();
 
         // Then
         assertNotNull(result);
@@ -265,15 +266,15 @@ class GetPositionUseCaseTest {
         // Given
         Position position = createTestPosition("TSLA");
         List<Position> positions = Collections.singletonList(position);
-        
+
         when(positionRepository.findAllWithShares()).thenReturn(Uni.createFrom().item(positions));
         when(marketDataPriceFetchService.getCurrentPrice("TSLA", null)).thenReturn(Uni.createFrom().item(new BigDecimal("800.75")));
 
         // When
         Uni<List<CurrentPosition>> uni = useCase.getActivePositions();
         List<CurrentPosition> result = uni.subscribe().withSubscriber(UniAssertSubscriber.create())
-            .assertCompleted()
-            .getItem();
+                .assertCompleted()
+                .getItem();
 
         // Then
         assertNotNull(result);
@@ -289,7 +290,7 @@ class GetPositionUseCaseTest {
         Position position1 = createTestPosition("AAPL");
         Position position2 = createTestPosition("MSFT");
         List<Position> positions = List.of(position1, position2);
-        
+
         when(positionRepository.findAllWithShares()).thenReturn(Uni.createFrom().item(positions));
         when(marketDataPriceFetchService.getCurrentPrice("AAPL", null)).thenReturn(Uni.createFrom().item(new BigDecimal("175.50")));
         when(marketDataPriceFetchService.getCurrentPrice("MSFT", null)).thenReturn(Uni.createFrom().failure(new RuntimeException("API error")));
@@ -298,8 +299,8 @@ class GetPositionUseCaseTest {
         // When
         Uni<List<CurrentPosition>> uni = useCase.getActivePositions();
         List<CurrentPosition> result = uni.subscribe().withSubscriber(UniAssertSubscriber.create())
-            .assertCompleted()
-            .getItem();
+                .assertCompleted()
+                .getItem();
 
         // Then
         assertNotNull(result);
@@ -340,8 +341,8 @@ class GetPositionUseCaseTest {
         // When
         Uni<Boolean> uni = useCase.existsByTicker(ticker);
         Boolean result = uni.subscribe().withSubscriber(UniAssertSubscriber.create())
-            .assertCompleted()
-            .getItem();
+                .assertCompleted()
+                .getItem();
 
         // Then
         assertTrue(result);
@@ -373,8 +374,8 @@ class GetPositionUseCaseTest {
         // When
         Uni<Long> uni = useCase.countAll();
         Long result = uni.subscribe().withSubscriber(UniAssertSubscriber.create())
-            .assertCompleted()
-            .getItem();
+                .assertCompleted()
+                .getItem();
 
         // Then
         assertEquals(42L, result);
@@ -405,8 +406,8 @@ class GetPositionUseCaseTest {
         // When
         Uni<Long> uni = useCase.countActivePositions();
         Long result = uni.subscribe().withSubscriber(UniAssertSubscriber.create())
-            .assertCompleted()
-            .getItem();
+                .assertCompleted()
+                .getItem();
 
         // Then
         assertEquals(7L, result);
@@ -443,8 +444,8 @@ class GetPositionUseCaseTest {
         // When
         Uni<CurrentPosition> uni = useCase.getById(id);
         CurrentPosition result = uni.subscribe().withSubscriber(UniAssertSubscriber.create())
-            .assertCompleted()
-            .getItem();
+                .assertCompleted()
+                .getItem();
 
         // Then
         assertNotNull(result);
@@ -476,61 +477,64 @@ class GetPositionUseCaseTest {
 
     static Stream<Arguments> fallbackScenarios() {
         Position positionWithStoredPrice = new Position(
-            UUID.randomUUID(),
-            "AAPL",
-            new BigDecimal("100"),
-            new BigDecimal("150.00"),
-            new BigDecimal("160.00"),
-            new BigDecimal("15000.00"),
-            BigDecimal.ZERO,
-            Currency.USD,
-            LocalDate.now().minusDays(1),
-            LocalDate.now().minusDays(10),
-            true,
-            null,
-            null,
-            null
+                UUID.randomUUID(),
+                "AAPL",
+                new BigDecimal("100"),
+                new BigDecimal("150.00"),
+                new BigDecimal("160.00"),
+                new BigDecimal("15000.00"),
+                BigDecimal.ZERO,
+                Currency.USD,
+                LocalDate.now().minusDays(1),
+                LocalDate.now().minusDays(10),
+                true,
+                Instant.now(),
+                null,
+                null,
+                List.of()
         );
-        
+
         Position positionWithNullPrice = new Position(
-            UUID.randomUUID(),
-            "MSFT",
-            new BigDecimal("100"),
-            new BigDecimal("150.00"),
-            null,
-            new BigDecimal("15000.00"),
-            BigDecimal.ZERO,
-            Currency.USD,
-            LocalDate.now().minusDays(1),
-            LocalDate.now().minusDays(10),
-            true,
-            null,
-            null,
-            null
+                UUID.randomUUID(),
+                "MSFT",
+                new BigDecimal("100"),
+                new BigDecimal("150.00"),
+                null,
+                new BigDecimal("15000.00"),
+                BigDecimal.ZERO,
+                Currency.USD,
+                LocalDate.now().minusDays(1),
+                LocalDate.now().minusDays(10),
+                true,
+                Instant.now(),
+                null,
+                null,
+                List.of()
         );
-        
+
         return Stream.of(
-            Arguments.of(positionWithStoredPrice, new BigDecimal("160.00")),
-            Arguments.of(positionWithNullPrice, BigDecimal.ZERO)
+                Arguments.of(positionWithStoredPrice, new BigDecimal("160.00")),
+                Arguments.of(positionWithNullPrice, BigDecimal.ZERO)
         );
     }
 
     private static Position createTestPosition(String ticker) {
         return new Position(
-            UUID.randomUUID(),
-            ticker,
-            new BigDecimal("100"),
-            new BigDecimal("150.00"),
-            new BigDecimal("160.00"),
-            new BigDecimal("15000.00"),
-            BigDecimal.ZERO,
-            Currency.USD,
-            LocalDate.now().minusDays(1),
-            LocalDate.now().minusDays(10),
-            true,
-            null,
-            null,
-            null
+                UUID.randomUUID(),
+                ticker,
+                new BigDecimal("100"),
+                new BigDecimal("150.00"),
+                new BigDecimal("160.00"),
+                new BigDecimal("15000.00"),
+                BigDecimal.ZERO,
+                Currency.USD,
+                LocalDate.now().minusDays(1),
+                LocalDate.now().minusDays(10),
+                true,
+                Instant.now(),
+                null,
+                null,
+                List.of()
         );
     }
 }

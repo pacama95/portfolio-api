@@ -4,6 +4,7 @@ import com.portfolio.domain.model.Position;
 import com.portfolio.infrastructure.persistence.entity.PositionEntity;
 import com.portfolio.infrastructure.persistence.mapper.PositionEntityMapper;
 import com.portfolio.infrastructure.persistence.repository.PositionPanacheRepository;
+import com.portfolio.infrastructure.persistence.repository.PositionTransactionRepository;
 import io.smallrye.mutiny.Uni;
 import io.smallrye.mutiny.helpers.test.UniAssertSubscriber;
 import org.junit.jupiter.api.BeforeEach;
@@ -18,14 +19,16 @@ import static org.mockito.Mockito.*;
 
 class PositionRepositoryAdapterTest {
     private PositionPanacheRepository panacheRepository;
+    private PositionTransactionRepository positionTransactionPanacheRepository;
     private PositionEntityMapper positionEntityMapper;
     private PositionRepositoryAdapter adapter;
 
     @BeforeEach
     void setUp() {
         panacheRepository = mock(PositionPanacheRepository.class);
+        positionTransactionPanacheRepository = mock(PositionTransactionRepository.class);
         positionEntityMapper = mock(PositionEntityMapper.class);
-        adapter = new PositionRepositoryAdapter(panacheRepository, positionEntityMapper);
+        adapter = new PositionRepositoryAdapter(panacheRepository, positionTransactionPanacheRepository, positionEntityMapper);
     }
 
     @Test

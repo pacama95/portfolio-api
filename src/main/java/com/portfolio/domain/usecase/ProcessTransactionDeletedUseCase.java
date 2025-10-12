@@ -22,25 +22,34 @@ public interface ProcessTransactionDeletedUseCase {
      * Result of processing a transaction deleted event
      */
     sealed interface Result {
-        record Success(Position position) implements Result {}
-        record Ignored(String reason) implements Result {}
-        record Error(com.portfolio.domain.exception.Error error, String message) implements Result {}
+        record Success(Position position) implements Result {
+        }
+
+        record Ignored(String reason) implements Result {
+        }
+
+        record Replay(String message, UUID transactionId, UUID positionId) implements Result {
+        }
+
+        record Error(com.portfolio.domain.exception.Error error, String message) implements Result {
+        }
     }
 
     /**
      * Command for transaction deleted event with full transaction details for rollback
      */
     record Command(
-        UUID transactionId,
-        String ticker,
-        String transactionType,
-        BigDecimal quantity,
-        BigDecimal price,
-        BigDecimal fees,
-        String currency,
-        LocalDate transactionDate,
-        Instant occurredAt,
-        String exchange,
-        String country
-    ) {}
+            UUID transactionId,
+            String ticker,
+            String transactionType,
+            BigDecimal quantity,
+            BigDecimal price,
+            BigDecimal fees,
+            String currency,
+            LocalDate transactionDate,
+            Instant occurredAt,
+            String exchange,
+            String country
+    ) {
+    }
 }

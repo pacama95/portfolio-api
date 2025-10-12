@@ -53,6 +53,18 @@ public interface RedisStreamConfig {
     String dlqSuffix();
 
     /**
+     * Delay in seconds before replaying a message
+     */
+    @WithDefault("10")
+    Long replayDelaySeconds();
+
+    /**
+     * Maximum number of replay attempts before considering it a failure
+     */
+    @WithDefault("3")
+    Integer maxReplayAttempts();
+
+    /**
      * Configuration for individual streams
      */
     interface StreamConfig {
