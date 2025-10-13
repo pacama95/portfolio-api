@@ -109,8 +109,9 @@ public class RedisStreamBootstrapService {
     private Uni<Void> createConsumerGroup(String streamName) {
         log.info("Creating consumer group {} for stream: {} (MKSTREAM)", config.group(), streamName);
 
-        return Uni.createFrom().item(() -> new XGroupCreateArgs().mkstream())
-                .map(args -> streamCommands.xgroupCreate(streamName, config.group(), "0", args))
+        XGroupCreateArgs args = new XGroupCreateArgs().mkstream();
+        
+        return streamCommands.xgroupCreate(streamName, config.group(), "0", args)
                 .onItem().transform(result -> {
                     log.info("Consumer group {} and stream {} created/verified successfully",
                             config.group(), streamName);
