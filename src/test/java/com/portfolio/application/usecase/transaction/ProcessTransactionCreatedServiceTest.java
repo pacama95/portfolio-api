@@ -19,9 +19,6 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
-/**
- * Unit tests for ProcessTransactionCreatedService
- */
 class ProcessTransactionCreatedServiceTest {
 
     private PositionRepository positionRepository;
@@ -43,7 +40,7 @@ class ProcessTransactionCreatedServiceTest {
         BigDecimal fees = new BigDecimal("1.50");
         Instant occurredAt = Instant.now();
 
-        when(positionRepository.findByTicker(ticker))
+        when(positionRepository.findByTickerForUpdate(ticker))
                 .thenReturn(Uni.createFrom().nullItem());
         when(positionRepository.save(any(Position.class)))
                 .thenAnswer(invocation -> {
@@ -74,7 +71,7 @@ class ProcessTransactionCreatedServiceTest {
         assertEquals("US", position.getCountry());
         assertTrue(position.getIsActive());
 
-        verify(positionRepository).findByTicker(ticker);
+        verify(positionRepository).findByTickerForUpdate(ticker);
         verify(positionRepository).save(any(Position.class));
         verify(positionRepository, never()).update(any(Position.class));
     }
@@ -96,11 +93,11 @@ class ProcessTransactionCreatedServiceTest {
                 LocalDate.now(), true, Instant.now().minusSeconds(100), null, null, new java.util.ArrayList<>()
         );
 
-        when(positionRepository.findByTicker(ticker))
+        when(positionRepository.findByTickerForUpdate(ticker))
                 .thenReturn(Uni.createFrom().item(existingPosition));
         when(positionRepository.isTransactionProcessed(positionId, transactionId))
                 .thenReturn(Uni.createFrom().item(false));
-        when(positionRepository.update(any(Position.class)))
+        when(positionRepository.updatePositionWithTransactions(any(Position.class)))
                 .thenAnswer(invocation -> {
                     Position pos = invocation.getArgument(0);
                     return Uni.createFrom().item(pos);
@@ -124,9 +121,9 @@ class ProcessTransactionCreatedServiceTest {
         Position position = successResult.position();
         assertEquals(new BigDecimal("15").setScale(6), position.getSharesOwned().setScale(6));
 
-        verify(positionRepository).findByTicker(ticker);
+        verify(positionRepository).findByTickerForUpdate(ticker);
         verify(positionRepository).isTransactionProcessed(positionId, transactionId);
-        verify(positionRepository).update(any(Position.class));
+        verify(positionRepository).updatePositionWithTransactions(any(Position.class));
         verify(positionRepository, never()).save(any(Position.class));
     }
 
@@ -147,11 +144,11 @@ class ProcessTransactionCreatedServiceTest {
                 LocalDate.now(), true, Instant.now().minusSeconds(100), null, null, new java.util.ArrayList<>()
         );
 
-        when(positionRepository.findByTicker(ticker))
+        when(positionRepository.findByTickerForUpdate(ticker))
                 .thenReturn(Uni.createFrom().item(existingPosition));
         when(positionRepository.isTransactionProcessed(positionId, transactionId))
                 .thenReturn(Uni.createFrom().item(false));
-        when(positionRepository.update(any(Position.class)))
+        when(positionRepository.updatePositionWithTransactions(any(Position.class)))
                 .thenAnswer(invocation -> {
                     Position pos = invocation.getArgument(0);
                     return Uni.createFrom().item(pos);
@@ -176,9 +173,9 @@ class ProcessTransactionCreatedServiceTest {
         assertEquals(new BigDecimal("15").setScale(6), position.getSharesOwned().setScale(6));
         assertTrue(position.getIsActive());
 
-        verify(positionRepository).findByTicker(ticker);
+        verify(positionRepository).findByTickerForUpdate(ticker);
         verify(positionRepository).isTransactionProcessed(positionId, transactionId);
-        verify(positionRepository).update(any(Position.class));
+        verify(positionRepository).updatePositionWithTransactions(any(Position.class));
     }
 
     @Test
@@ -195,7 +192,7 @@ class ProcessTransactionCreatedServiceTest {
                 LocalDate.now(), true, Instant.now().minusSeconds(100), null, null, new java.util.ArrayList<>()
         );
 
-        when(positionRepository.findByTicker(ticker))
+        when(positionRepository.findByTickerForUpdate(ticker))
                 .thenReturn(Uni.createFrom().item(existingPosition));
         when(positionRepository.isTransactionProcessed(positionId, transactionId))
                 .thenReturn(Uni.createFrom().item(true));
@@ -217,9 +214,9 @@ class ProcessTransactionCreatedServiceTest {
         ProcessTransactionCreatedUseCase.Result.Ignored ignoredResult = (ProcessTransactionCreatedUseCase.Result.Ignored) result;
         assertEquals("Transaction already processed", ignoredResult.reason());
 
-        verify(positionRepository).findByTicker(ticker);
+        verify(positionRepository).findByTickerForUpdate(ticker);
         verify(positionRepository).isTransactionProcessed(positionId, transactionId);
-        verify(positionRepository, never()).update(any(Position.class));
+        verify(positionRepository, never()).updatePositionWithTransactions(any(Position.class));
         verify(positionRepository, never()).save(any(Position.class));
     }
 
@@ -232,7 +229,7 @@ class ProcessTransactionCreatedServiceTest {
 
         RuntimeException dbException = new RuntimeException("Database connection failed");
 
-        when(positionRepository.findByTicker(ticker))
+        when(positionRepository.findByTickerForUpdate(ticker))
                 .thenReturn(Uni.createFrom().nullItem());
         when(positionRepository.save(any(Position.class)))
                 .thenReturn(Uni.createFrom().failure(dbException));
@@ -255,7 +252,7 @@ class ProcessTransactionCreatedServiceTest {
         assertEquals(Errors.ProcessTransactionEvent.PERSISTENCE_ERROR, errorResult.error());
         assertTrue(errorResult.message().contains("Failed to process transaction created event"));
 
-        verify(positionRepository).findByTicker(ticker);
+        verify(positionRepository).findByTickerForUpdate(ticker);
         verify(positionRepository).save(any(Position.class));
     }
 
@@ -276,11 +273,11 @@ class ProcessTransactionCreatedServiceTest {
                 LocalDate.now(), true, Instant.now().minusSeconds(100), null, null, new java.util.ArrayList<>()
         );
 
-        when(positionRepository.findByTicker(ticker))
+        when(positionRepository.findByTickerForUpdate(ticker))
                 .thenReturn(Uni.createFrom().item(existingPosition));
         when(positionRepository.isTransactionProcessed(positionId, transactionId))
                 .thenReturn(Uni.createFrom().item(false));
-        when(positionRepository.update(any(Position.class)))
+        when(positionRepository.updatePositionWithTransactions(any(Position.class)))
                 .thenAnswer(invocation -> {
                     Position pos = invocation.getArgument(0);
                     return Uni.createFrom().item(pos);
@@ -305,6 +302,6 @@ class ProcessTransactionCreatedServiceTest {
         assertEquals(BigDecimal.ZERO.setScale(6), position.getSharesOwned().setScale(6));
         assertFalse(position.getIsActive());
 
-        verify(positionRepository).update(any(Position.class));
+        verify(positionRepository).updatePositionWithTransactions(any(Position.class));
     }
 }

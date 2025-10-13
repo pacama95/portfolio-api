@@ -1,5 +1,7 @@
 package com.portfolio.domain.model;
 
+import com.portfolio.domain.exception.Errors;
+import com.portfolio.domain.exception.ServiceException;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
@@ -155,9 +157,10 @@ class PositionTest {
         Position position = new Position("AAPL", Currency.USD);
 
         // When/Then
-        assertThrows(IllegalArgumentException.class, () ->
+        ServiceException exception = assertThrows(ServiceException.class, () ->
                 position.applyBuy(null, new BigDecimal("150.00"), BigDecimal.ZERO)
         );
+        assertEquals(Errors.Position.INVALID_INPUT, exception.getError());
     }
 
     @Test
@@ -166,9 +169,10 @@ class PositionTest {
         Position position = new Position("AAPL", Currency.USD);
 
         // When/Then
-        assertThrows(IllegalArgumentException.class, () ->
+        ServiceException exception = assertThrows(ServiceException.class, () ->
                 position.applyBuy(BigDecimal.ZERO, new BigDecimal("150.00"), BigDecimal.ZERO)
         );
+        assertEquals(Errors.Position.INVALID_INPUT, exception.getError());
     }
 
     @Test
@@ -177,9 +181,10 @@ class PositionTest {
         Position position = new Position("AAPL", Currency.USD);
 
         // When/Then
-        assertThrows(IllegalArgumentException.class, () ->
+        ServiceException exception = assertThrows(ServiceException.class, () ->
                 position.applyBuy(new BigDecimal("-10"), new BigDecimal("150.00"), BigDecimal.ZERO)
         );
+        assertEquals(Errors.Position.INVALID_INPUT, exception.getError());
     }
 
     @Test
@@ -188,9 +193,10 @@ class PositionTest {
         Position position = new Position("AAPL", Currency.USD);
 
         // When/Then
-        assertThrows(IllegalArgumentException.class, () ->
+        ServiceException exception = assertThrows(ServiceException.class, () ->
                 position.applyBuy(BigDecimal.TEN, null, BigDecimal.ZERO)
         );
+        assertEquals(Errors.Position.INVALID_INPUT, exception.getError());
     }
 
     @Test
@@ -199,9 +205,10 @@ class PositionTest {
         Position position = new Position("AAPL", Currency.USD);
 
         // When/Then
-        assertThrows(IllegalArgumentException.class, () ->
+        ServiceException exception = assertThrows(ServiceException.class, () ->
                 position.applyBuy(BigDecimal.TEN, new BigDecimal("-150.00"), BigDecimal.ZERO)
         );
+        assertEquals(Errors.Position.INVALID_INPUT, exception.getError());
     }
 
     @Test
@@ -213,9 +220,9 @@ class PositionTest {
         // When: Sell 5 shares at $150 with $2 fees
         position.applySell(new BigDecimal("5"), new BigDecimal("150.00"), new BigDecimal("2.00"));
 
-        // Then: 20 - 5 = 15 shares, invested = 2000 - (5 * 100) - 2 = 1498
+        // Then: 20 - 5 = 15 shares, invested = 2000 - (5 * 100) = 1500
         assertEquals(new BigDecimal("15").setScale(6), position.getSharesOwned().setScale(6));
-        assertEquals(0, new BigDecimal("1498.00").compareTo(position.getTotalInvestedAmount()));
+        assertEquals(0, new BigDecimal("1500.00").compareTo(position.getTotalInvestedAmount()));
         assertEquals(new BigDecimal("2.00"), position.getTotalTransactionFees());
         assertEquals(new BigDecimal("150.00"), position.getLatestMarketPrice());
         assertTrue(position.getIsActive());
@@ -236,17 +243,16 @@ class PositionTest {
     }
 
     @Test
-    void testApplySell_DoesNotGoNegative() {
+    void testApplySell_ThrowsExceptionWhenOverselling() {
         // Given
         Position position = new Position("AAPL", Currency.USD);
         position.applyBuy(new BigDecimal("5"), new BigDecimal("100.00"), BigDecimal.ZERO);
 
-        // When: Try to sell more than owned
-        position.applySell(BigDecimal.TEN, new BigDecimal("150.00"), BigDecimal.ZERO);
-
-        // Then: Should not go negative
-        assertEquals(BigDecimal.ZERO.setScale(6), position.getSharesOwned().setScale(6));
-        assertEquals(BigDecimal.ZERO, position.getTotalInvestedAmount());
+        // When/Then: Try to sell more than owned
+        ServiceException exception = assertThrows(ServiceException.class, () ->
+                position.applySell(BigDecimal.TEN, new BigDecimal("150.00"), BigDecimal.ZERO)
+        );
+        assertEquals(Errors.Position.OVERSELL, exception.getError());
     }
 
     @Test
@@ -269,18 +275,25 @@ class PositionTest {
         position.applyBuy(BigDecimal.TEN, new BigDecimal("100.00"), BigDecimal.ZERO);
 
         // When/Then
-        assertThrows(IllegalArgumentException.class, () ->
+        ServiceException exception1 = assertThrows(ServiceException.class, () ->
                 position.applySell(null, new BigDecimal("150.00"), BigDecimal.ZERO)
         );
-        assertThrows(IllegalArgumentException.class, () ->
+        assertEquals(Errors.Position.INVALID_INPUT, exception1.getError());
+
+        ServiceException exception2 = assertThrows(ServiceException.class, () ->
                 position.applySell(BigDecimal.ZERO, new BigDecimal("150.00"), BigDecimal.ZERO)
         );
-        assertThrows(IllegalArgumentException.class, () ->
+        assertEquals(Errors.Position.INVALID_INPUT, exception2.getError());
+
+        ServiceException exception3 = assertThrows(ServiceException.class, () ->
                 position.applySell(BigDecimal.TEN, null, BigDecimal.ZERO)
         );
-        assertThrows(IllegalArgumentException.class, () ->
+        assertEquals(Errors.Position.INVALID_INPUT, exception3.getError());
+
+        ServiceException exception4 = assertThrows(ServiceException.class, () ->
                 position.applySell(BigDecimal.TEN, new BigDecimal("-150.00"), BigDecimal.ZERO)
         );
+        assertEquals(Errors.Position.INVALID_INPUT, exception4.getError());
     }
 
     @Test
@@ -546,8 +559,8 @@ class PositionTest {
         assertEquals(new BigDecimal("15").setScale(6), position.getSharesOwned().setScale(6));
         // Average cost = (1001 + 1501) / 20 = 125.1
         assertEquals(new BigDecimal("125.100000"), position.getAverageCostPerShare());
-        // Invested = 2502 - (5 * 125.1) - 1 = 1875.5
-        assertEquals(0, new BigDecimal("1875.50").compareTo(position.getTotalInvestedAmount()));
+        // Invested = 2502 - (5 * 125.1) = 1876.5
+        assertEquals(0, new BigDecimal("1876.50").compareTo(position.getTotalInvestedAmount()));
         // Total fees = 1 + 1 + 1 = 3
         assertEquals(new BigDecimal("3.00"), position.getTotalTransactionFees());
         assertTrue(position.getIsActive());
@@ -591,8 +604,6 @@ class PositionTest {
         position.applyBuy(new BigDecimal("20"), new BigDecimal("100.00"), BigDecimal.ZERO);
         UUID sellTxId = UUID.randomUUID();
         position.applyTransaction(sellTxId, "SELL", new BigDecimal("5"), new BigDecimal("150.00"), new BigDecimal("2.00"));
-
-        BigDecimal investedAfterSell = position.getTotalInvestedAmount();
 
         // When: Reverse the sell
         position.reverseTransaction(sellTxId, "SELL", new BigDecimal("5"), new BigDecimal("150.00"), new BigDecimal("2.00"));

@@ -19,9 +19,6 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
-/**
- * Unit tests for ProcessTransactionDeletedService
- */
 class ProcessTransactionDeletedServiceTest {
 
     private PositionRepository positionRepository;
@@ -48,11 +45,11 @@ class ProcessTransactionDeletedServiceTest {
         position.applyBuy(new BigDecimal("20"), new BigDecimal("150.00"), new BigDecimal("2.00"));
         position.updateLastEventAppliedAt(Instant.now().minusSeconds(100));
 
-        when(positionRepository.findByTicker(ticker))
+        when(positionRepository.findByTickerForUpdate(ticker))
                 .thenReturn(Uni.createFrom().item(position));
         when(positionRepository.isTransactionProcessed(any(), eq(transactionId)))
                 .thenReturn(Uni.createFrom().item(true));
-        when(positionRepository.update(any(Position.class)))
+        when(positionRepository.updatePositionWithTransactions(any(Position.class)))
                 .thenReturn(Uni.createFrom().item(position));
 
         ProcessTransactionDeletedUseCase.Command command = new ProcessTransactionDeletedUseCase.Command(
@@ -74,9 +71,9 @@ class ProcessTransactionDeletedServiceTest {
         assertEquals(BigDecimal.TEN.setScale(6), successResult.position().getSharesOwned().setScale(6));
 
         // Verify repository interactions
-        verify(positionRepository).findByTicker(ticker);
+        verify(positionRepository).findByTickerForUpdate(ticker);
         verify(positionRepository).isTransactionProcessed(any(), eq(transactionId));
-        verify(positionRepository).update(any(Position.class));
+        verify(positionRepository).updatePositionWithTransactions(any(Position.class));
     }
 
     @Test
@@ -95,11 +92,11 @@ class ProcessTransactionDeletedServiceTest {
         position.applySell(quantity, price, fees); // Now has 15 shares
         position.updateLastEventAppliedAt(Instant.now().minusSeconds(100));
 
-        when(positionRepository.findByTicker(ticker))
+        when(positionRepository.findByTickerForUpdate(ticker))
                 .thenReturn(Uni.createFrom().item(position));
         when(positionRepository.isTransactionProcessed(any(), eq(transactionId)))
                 .thenReturn(Uni.createFrom().item(true));
-        when(positionRepository.update(any(Position.class)))
+        when(positionRepository.updatePositionWithTransactions(any(Position.class)))
                 .thenReturn(Uni.createFrom().item(position));
 
         ProcessTransactionDeletedUseCase.Command command = new ProcessTransactionDeletedUseCase.Command(
@@ -120,9 +117,9 @@ class ProcessTransactionDeletedServiceTest {
         // Verify the SELL was reversed (15 shares + 5 shares = 20 shares)
         assertEquals(new BigDecimal("20").setScale(6), successResult.position().getSharesOwned().setScale(6));
 
-        verify(positionRepository).findByTicker(ticker);
+        verify(positionRepository).findByTickerForUpdate(ticker);
         verify(positionRepository).isTransactionProcessed(any(), eq(transactionId));
-        verify(positionRepository).update(any(Position.class));
+        verify(positionRepository).updatePositionWithTransactions(any(Position.class));
     }
 
     @Test
@@ -132,7 +129,7 @@ class ProcessTransactionDeletedServiceTest {
         String ticker = "TSLA";
         Instant occurredAt = Instant.now();
 
-        when(positionRepository.findByTicker(ticker))
+        when(positionRepository.findByTickerForUpdate(ticker))
                 .thenReturn(Uni.createFrom().nullItem());
 
         ProcessTransactionDeletedUseCase.Command command = new ProcessTransactionDeletedUseCase.Command(
@@ -154,7 +151,7 @@ class ProcessTransactionDeletedServiceTest {
         assertEquals(transactionId, replayResult.transactionId());
         assertNull(replayResult.positionId());
 
-        verify(positionRepository).findByTicker(ticker);
+        verify(positionRepository).findByTickerForUpdate(ticker);
         verify(positionRepository, never()).update(any(Position.class));
     }
 
@@ -169,7 +166,7 @@ class ProcessTransactionDeletedServiceTest {
         position.applyBuy(BigDecimal.TEN, new BigDecimal("150.00"), BigDecimal.ONE);
         position.updateLastEventAppliedAt(Instant.now().minusSeconds(100));
 
-        when(positionRepository.findByTicker(ticker))
+        when(positionRepository.findByTickerForUpdate(ticker))
                 .thenReturn(Uni.createFrom().item(position));
         when(positionRepository.isTransactionProcessed(any(), eq(transactionId)))
                 .thenReturn(Uni.createFrom().item(false));
@@ -193,7 +190,7 @@ class ProcessTransactionDeletedServiceTest {
         assertEquals(transactionId, replayResult.transactionId());
         assertEquals(position.getId(), replayResult.positionId());
 
-        verify(positionRepository).findByTicker(ticker);
+        verify(positionRepository).findByTickerForUpdate(ticker);
         verify(positionRepository).isTransactionProcessed(any(), eq(transactionId));
         verify(positionRepository, never()).update(any(Position.class));
     }
@@ -211,11 +208,11 @@ class ProcessTransactionDeletedServiceTest {
 
         RuntimeException dbException = new RuntimeException("Database connection failed");
 
-        when(positionRepository.findByTicker(ticker))
+        when(positionRepository.findByTickerForUpdate(ticker))
                 .thenReturn(Uni.createFrom().item(position));
         when(positionRepository.isTransactionProcessed(any(), eq(transactionId)))
                 .thenReturn(Uni.createFrom().item(true));
-        when(positionRepository.update(any(Position.class)))
+        when(positionRepository.updatePositionWithTransactions(any(Position.class)))
                 .thenReturn(Uni.createFrom().failure(dbException));
 
         ProcessTransactionDeletedUseCase.Command command = new ProcessTransactionDeletedUseCase.Command(
@@ -236,9 +233,9 @@ class ProcessTransactionDeletedServiceTest {
         assertEquals(Errors.ProcessTransactionEvent.PERSISTENCE_ERROR, errorResult.error());
         assertTrue(errorResult.message().contains("Failed to process transaction deleted event"));
 
-        verify(positionRepository).findByTicker(ticker);
+        verify(positionRepository).findByTickerForUpdate(ticker);
         verify(positionRepository).isTransactionProcessed(any(), eq(transactionId));
-        verify(positionRepository).update(any(Position.class));
+        verify(positionRepository).updatePositionWithTransactions(any(Position.class));
     }
 
     @Test
@@ -253,11 +250,11 @@ class ProcessTransactionDeletedServiceTest {
         Instant oldEventTime = Instant.now().minusSeconds(100);
         position.updateLastEventAppliedAt(oldEventTime);
 
-        when(positionRepository.findByTicker(ticker))
+        when(positionRepository.findByTickerForUpdate(ticker))
                 .thenReturn(Uni.createFrom().item(position));
         when(positionRepository.isTransactionProcessed(any(), eq(transactionId)))
                 .thenReturn(Uni.createFrom().item(true));
-        when(positionRepository.update(any(Position.class)))
+        when(positionRepository.updatePositionWithTransactions(any(Position.class)))
                 .thenReturn(Uni.createFrom().item(position));
 
         ProcessTransactionDeletedUseCase.Command command = new ProcessTransactionDeletedUseCase.Command(
@@ -289,11 +286,11 @@ class ProcessTransactionDeletedServiceTest {
         position.applyBuy(quantity, price, fees); // Position has exactly 10 shares
         position.updateLastEventAppliedAt(Instant.now().minusSeconds(100));
 
-        when(positionRepository.findByTicker(ticker))
+        when(positionRepository.findByTickerForUpdate(ticker))
                 .thenReturn(Uni.createFrom().item(position));
         when(positionRepository.isTransactionProcessed(any(), eq(transactionId)))
                 .thenReturn(Uni.createFrom().item(true));
-        when(positionRepository.update(any(Position.class)))
+        when(positionRepository.updatePositionWithTransactions(any(Position.class)))
                 .thenReturn(Uni.createFrom().item(position));
 
         ProcessTransactionDeletedUseCase.Command command = new ProcessTransactionDeletedUseCase.Command(
