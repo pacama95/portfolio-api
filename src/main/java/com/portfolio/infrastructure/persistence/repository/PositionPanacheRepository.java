@@ -33,7 +33,7 @@ public class PositionPanacheRepository implements PanacheRepository<PositionEnti
 
     @WithSession
     public Uni<PositionEntity> findByTickerWithTransactions(String ticker) {
-        return find("SELECT p FROM PositionEntity p JOIN FETCH p.transactions WHERE p.ticker = ?1", ticker)
+        return find("SELECT p FROM PositionEntity p LEFT JOIN FETCH p.transactions WHERE p.ticker = ?1", ticker)
                 .withLock(LockModeType.PESSIMISTIC_WRITE)
                 .firstResult();
     }
