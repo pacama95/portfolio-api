@@ -49,20 +49,27 @@ public class RedisStreamBootstrapService {
 
     /**
      * Initialize on application startup
+     * IMPORTANT: This method blocks to ensure consumers are started before the application is ready.
+     * This is critical for native image builds where async subscriptions may not complete before startup.
      */
     void onStart(@Observes StartupEvent ev) {
         log.info("Starting Redis Stream bootstrap process");
 
         streamCommands = redisDataSource.stream(String.class, String.class, String.class);
 
-        initializeStreamsAndConsumerGroup()
-                .subscribe().with(
-                        result -> {
-                            log.info("Consumer group {} ready", config.group());
-                            startAllConsumers();
-                        },
-                        failure -> log.error("Failed to initialize consumer group", failure)
-                );
+        try {
+            // Block and await the initialization to complete before starting consumers
+            // This ensures consumers are running before the application is considered started
+            initializeStreamsAndConsumerGroup()
+                    .await().indefinitely();
+            
+            log.info("Consumer group {} ready", config.group());
+            startAllConsumers();
+            log.info("All Redis Stream consumers started successfully");
+        } catch (Exception e) {
+            log.error("Failed to initialize consumer group and start consumers", e);
+            throw new RuntimeException("Redis Stream initialization failed", e);
+        }
     }
 
     void onStop(@Observes ShutdownEvent ev) {

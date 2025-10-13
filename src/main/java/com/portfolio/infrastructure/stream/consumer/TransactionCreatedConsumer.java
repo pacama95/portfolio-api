@@ -66,20 +66,24 @@ public class TransactionCreatedConsumer extends BaseRedisStreamConsumer {
 
     public Cancellable startConsuming() {
         if (running.compareAndSet(false, true)) {
-            log.info("Starting Redis Stream consumer for stream: {}", STREAM_NAME);
+            log.info("🚀 Starting Redis Stream consumer for stream: {} with consumer: {} in group: {}", 
+                    STREAM_NAME, config.consumerName(), config.group());
 
             consumerSubscription = createConsumerPipeline()
                     .subscribe().with(
-                            result -> log.info("Processed message"),
+                            result -> log.debug("Processed message successfully"),
                             failure -> {
-                                log.error("Failed to process message", failure);
+                                log.error("❌ Consumer pipeline failed for stream {}", STREAM_NAME, failure);
                                 if (running.get()) {
                                     scheduleRestart();
                                 }
                             },
-                            () -> log.error("Consumer pipeline completed")
+                            () -> log.error("⚠️ Consumer pipeline completed unexpectedly for stream {}", STREAM_NAME)
                     );
-
+            
+            log.info("✅ Consumer subscription active for stream: {}", STREAM_NAME);
+        } else {
+            log.warn("Consumer for stream {} is already running", STREAM_NAME);
         }
 
         return consumerSubscription;
@@ -106,11 +110,19 @@ public class TransactionCreatedConsumer extends BaseRedisStreamConsumer {
     }
 
     private Uni<List<StreamMessage<String, String, String>>> fetchMessages() {
+        log.debug("Polling stream {} with consumer {} in group {}", STREAM_NAME, config.consumerName(), config.group());
         return streamCommands.xreadgroup(
                         config.group(),
                         config.consumerName(),
                         streamOffsets,
                         xReadGroupArgs)
+                .onItem().invoke(messages -> {
+                    if (!messages.isEmpty()) {
+                        log.info("Fetched {} messages from stream {}", messages.size(), STREAM_NAME);
+                    }
+                })
+                .onFailure().invoke(throwable -> 
+                    log.error("Failed to fetch messages from stream {}: {}", STREAM_NAME, throwable.getMessage()))
                 .onFailure().retry().withBackOff(Duration.ofSeconds(1)).atMost(3)
                 .onFailure().recoverWithItem(List.of());
     }
