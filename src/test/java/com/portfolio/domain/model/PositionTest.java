@@ -613,4 +613,18 @@ class PositionTest {
         assertEquals(0, new BigDecimal("2000.00").compareTo(position.getTotalInvestedAmount()));
         assertEquals(0, BigDecimal.ZERO.compareTo(position.getTotalTransactionFees()));
     }
+
+    @Test
+    void testReverseSell_ThrowsExceptionWhenAverageCostIsZero() {
+        // Given: Position with no shares and zero average cost (simulating all buys reversed)
+        Position position = new Position("AAPL", Currency.USD);
+        UUID sellTxId = UUID.randomUUID();
+
+        // When/Then: Attempting to reverse a sell should throw exception
+        ServiceException exception = assertThrows(ServiceException.class, () ->
+                position.reverseTransaction(sellTxId, "SELL", new BigDecimal("5"), new BigDecimal("150.00"), BigDecimal.ZERO)
+        );
+        assertEquals(Errors.Position.INVALID_TRANSACTION_REVERSAL, exception.getError());
+        assertTrue(exception.getMessage().contains("average cost is zero"));
+    }
 }

@@ -66,7 +66,7 @@ public class TransactionCreatedConsumer extends BaseRedisStreamConsumer {
 
     public Cancellable startConsuming() {
         if (running.compareAndSet(false, true)) {
-            log.info("🚀 Starting Redis Stream consumer for stream: {} with consumer: {} in group: {}", 
+            log.info("🚀 Starting Redis Stream consumer for stream: {} with consumer: {} in group: {}",
                     STREAM_NAME, config.consumerName(), config.group());
 
             consumerSubscription = createConsumerPipeline()
@@ -80,7 +80,7 @@ public class TransactionCreatedConsumer extends BaseRedisStreamConsumer {
                             },
                             () -> log.error("⚠️ Consumer pipeline completed unexpectedly for stream {}", STREAM_NAME)
                     );
-            
+
             log.info("✅ Consumer subscription active for stream: {}", STREAM_NAME);
         } else {
             log.warn("Consumer for stream {} is already running", STREAM_NAME);
@@ -121,8 +121,8 @@ public class TransactionCreatedConsumer extends BaseRedisStreamConsumer {
                         log.info("Fetched {} messages from stream {}", messages.size(), STREAM_NAME);
                     }
                 })
-                .onFailure().invoke(throwable -> 
-                    log.error("Failed to fetch messages from stream {}: {}", STREAM_NAME, throwable.getMessage()))
+                .onFailure().invoke(throwable ->
+                        log.error("Failed to fetch messages from stream {}: {}", STREAM_NAME, throwable.getMessage()))
                 .onFailure().retry().withBackOff(Duration.ofSeconds(1)).atMost(3)
                 .onFailure().recoverWithItem(List.of());
     }
@@ -239,8 +239,8 @@ public class TransactionCreatedConsumer extends BaseRedisStreamConsumer {
                     errorCounter.increment();
                     yield Uni.createFrom().item(result);
                 } else {
-                    log.info("🔄 Scheduling replay #{} for transaction {} after {}s (position: {})",
-                            attempts, replay.transactionId(), config.replayDelaySeconds(), replay.positionId());
+                    log.info("🔄 Scheduling replay #{} for transaction {} after {}s",
+                            attempts, replay.transactionId(), config.replayDelaySeconds());
 
                     // Schedule delayed replay - don't ACK yet
                     yield scheduleReplay(message, command, attempts)

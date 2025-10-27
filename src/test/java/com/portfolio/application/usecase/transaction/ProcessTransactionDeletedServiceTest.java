@@ -152,7 +152,6 @@ class ProcessTransactionDeletedServiceTest {
         assertNull(replayResult.positionId());
 
         verify(positionRepository).findByTickerForUpdate(ticker);
-        verify(positionRepository, never()).update(any(Position.class));
     }
 
     @Test
@@ -192,7 +191,6 @@ class ProcessTransactionDeletedServiceTest {
 
         verify(positionRepository).findByTickerForUpdate(ticker);
         verify(positionRepository).isTransactionProcessed(any(), eq(transactionId));
-        verify(positionRepository, never()).update(any(Position.class));
     }
 
     @Test
@@ -311,6 +309,50 @@ class ProcessTransactionDeletedServiceTest {
         // After reversing the only BUY, position should have 0 shares and be inactive
         assertEquals(BigDecimal.ZERO.setScale(6), successResult.position().getSharesOwned().setScale(6));
         assertFalse(successResult.position().getIsActive());
+    }
+
+    @Test
+    void testRollback_ReverseSellWithZeroAverageCost_ReturnsReplay() {
+        // Given: A position with zero average cost (simulating all buys reversed)
+        // Attempting to reverse a SELL should trigger a replay
+        UUID transactionId = UUID.randomUUID();
+        String ticker = "NFLX";
+        BigDecimal quantity = new BigDecimal("5");
+        BigDecimal price = new BigDecimal("500.00");
+        BigDecimal fees = BigDecimal.ZERO;
+        Instant occurredAt = Instant.now();
+
+        // Create a position with zero shares and zero average cost
+        Position position = new Position(ticker, Currency.USD);
+        position.updateLastEventAppliedAt(Instant.now().minusSeconds(100));
+
+        when(positionRepository.findByTickerForUpdate(ticker))
+                .thenReturn(Uni.createFrom().item(position));
+        when(positionRepository.isTransactionProcessed(any(), eq(transactionId)))
+                .thenReturn(Uni.createFrom().item(true));
+
+        ProcessTransactionDeletedUseCase.Command command = new ProcessTransactionDeletedUseCase.Command(
+                transactionId, ticker, "SELL", quantity, price, fees, "USD", LocalDate.now(), occurredAt, null, null
+        );
+
+        // When
+        ProcessTransactionDeletedUseCase.Result result = service.execute(command)
+                .subscribe()
+                .withSubscriber(UniAssertSubscriber.create())
+                .assertCompleted()
+                .getItem();
+
+        // Then: Should return Replay result to retry later when buy transactions are reversed
+        assertInstanceOf(ProcessTransactionDeletedUseCase.Result.Replay.class, result);
+        ProcessTransactionDeletedUseCase.Result.Replay replayResult = (ProcessTransactionDeletedUseCase.Result.Replay) result;
+        assertEquals(transactionId, replayResult.transactionId());
+        assertEquals(position.getId(), replayResult.positionId());
+        assertTrue(replayResult.message().contains("average cost is zero"));
+
+        verify(positionRepository).findByTickerForUpdate(ticker);
+        verify(positionRepository).isTransactionProcessed(any(), eq(transactionId));
+        // updatePositionWithTransactions should NOT be called since we failed before that
+        verify(positionRepository, never()).updatePositionWithTransactions(any(Position.class));
     }
 
 }

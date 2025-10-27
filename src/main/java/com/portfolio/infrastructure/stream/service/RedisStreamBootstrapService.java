@@ -62,7 +62,7 @@ public class RedisStreamBootstrapService {
             // This ensures consumers are running before the application is considered started
             initializeStreamsAndConsumerGroup()
                     .await().indefinitely();
-            
+
             log.info("Consumer group {} ready", config.group());
             startAllConsumers();
             log.info("All Redis Stream consumers started successfully");
@@ -110,7 +110,7 @@ public class RedisStreamBootstrapService {
         log.info("Creating consumer group {} for stream: {} (MKSTREAM)", config.group(), streamName);
 
         XGroupCreateArgs args = new XGroupCreateArgs().mkstream();
-        
+
         return streamCommands.xgroupCreate(streamName, config.group(), "0", args)
                 .onItem().transform(result -> {
                     log.info("Consumer group {} and stream {} created/verified successfully",

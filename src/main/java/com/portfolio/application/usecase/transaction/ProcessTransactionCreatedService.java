@@ -13,6 +13,8 @@ import jakarta.persistence.PersistenceException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.time.Duration;
+
 /**
  * Service for processing transaction created events
  */
@@ -33,17 +35,11 @@ public class ProcessTransactionCreatedService implements ProcessTransactionCreat
         log.info("Processing transaction created: transactionId={}, ticker={}, occurredAt={}",
                 command.transactionId(), command.ticker(), command.occurredAt());
 
-        return positionRepository.findByTickerForUpdate(command.ticker())
-                .flatMap(position -> isProcessedTransaction(command, position)
-                        .flatMap(processed -> {
-                            if (processed) {
-                                log.info("Transaction already processed: transactionId={}, ticker={}",
-                                        command.transactionId(), command.ticker());
-                                return Uni.createFrom().item(new Result.Ignored("Transaction already processed"));
-                            }
-                            return processTransaction(position, command);
-                        }))
-                .onFailure(PersistenceException.class).retry().atMost(3)
+        return Uni.createFrom().deferred(() -> upsertPosition(command))
+                .onFailure(this::isDuplicatedPositionException).retry().withBackOff(Duration.ofMillis(100)).atMost(2)
+                .onFailure(this::isAlreadyProcessedException).recoverWithItem(ignored -> new Result.Ignored("Transaction already processed"))
+                .onFailure(this::isReplayableException).recoverWithUni(throwable -> Uni.createFrom().item(() -> new Result.Replay(throwable.getMessage(), command.transactionId())))
+                .onFailure(PersistenceException.class).retry().withBackOff(Duration.ofMillis(100)).atMost(3)
                 .onFailure().recoverWithItem(throwable -> {
                     log.error("Error processing transaction created event: {}", command.transactionId(), throwable);
                     return new Result.Error(
@@ -53,8 +49,23 @@ public class ProcessTransactionCreatedService implements ProcessTransactionCreat
                 });
     }
 
+    private Uni<Result> upsertPosition(Command command) {
+        return positionRepository.findByTickerForUpdate(command.ticker())
+                .flatMap(position -> isProcessedTransaction(command, position)
+                        .flatMap(processed -> {
+                            if (processed) {
+                                log.info("Transaction already processed: transactionId={}, ticker={}",
+                                        command.transactionId(), command.ticker());
+                                return Uni.createFrom().item(new Result.Ignored("Transaction already processed"));
+                            }
+                            return processTransaction(position, command);
+                        }));
+    }
+
     private Uni<Boolean> isProcessedTransaction(Command command, Position position) {
-        return position != null ? positionRepository.isTransactionProcessed(position.getId(), command.transactionId()) : Uni.createFrom().item(false);
+        return position != null
+                ? positionRepository.isTransactionProcessed(position.getId(), command.transactionId())
+                : Uni.createFrom().item(false);
     }
 
     private Uni<Result> processTransaction(Position existingPosition, Command command) {
@@ -65,15 +76,6 @@ public class ProcessTransactionCreatedService implements ProcessTransactionCreat
                             : positionRepository.save(position);
 
                     return saveOperation.map(saved -> (Result) new Result.Success(saved));
-                })
-                .onFailure(this::isReplayableException).recoverWithUni(throwable ->
-                        Uni.createFrom().item(() -> new Result.Replay(throwable.getMessage(), command.transactionId(), existingPosition.getId())))
-                .onFailure().recoverWithItem(throwable -> {
-                    log.error("Error processing transaction created event: {}", command.transactionId(), throwable);
-                    return new Result.Error(
-                            Errors.ProcessTransactionEvent.PERSISTENCE_ERROR,
-                            "Failed to process transaction created event: " + throwable.getMessage()
-                    );
                 });
     }
 
@@ -104,4 +106,13 @@ public class ProcessTransactionCreatedService implements ProcessTransactionCreat
                 && serviceException.getError() == Errors.Position.OVERSELL;
     }
 
+    private boolean isAlreadyProcessedException(Throwable throwable) {
+        return throwable instanceof ServiceException serviceException
+                && serviceException.getError() == Errors.ProcessTransactionEvent.ALREADY_PROCESSED;
+    }
+
+    private boolean isDuplicatedPositionException(Throwable throwable) {
+        return throwable instanceof ServiceException serviceException
+                && serviceException.getError() == Errors.ProcessTransactionEvent.DUPLICATED_POSITION;
+    }
 }

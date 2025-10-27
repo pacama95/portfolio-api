@@ -1,5 +1,7 @@
 package com.portfolio.infrastructure.persistence.adapter;
 
+import com.portfolio.domain.exception.Errors;
+import com.portfolio.domain.exception.ServiceException;
 import com.portfolio.domain.model.Position;
 import com.portfolio.domain.port.PositionRepository;
 import com.portfolio.infrastructure.persistence.entity.PositionEntity;
@@ -10,14 +12,18 @@ import io.quarkus.hibernate.reactive.panache.common.WithSession;
 import io.quarkus.hibernate.reactive.panache.common.WithTransaction;
 import io.smallrye.mutiny.Uni;
 import jakarta.enterprise.context.ApplicationScoped;
+import lombok.extern.slf4j.Slf4j;
+import org.hibernate.exception.ConstraintViolationException;
 
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
 
+@Slf4j
 @ApplicationScoped
 public class PositionRepositoryAdapter implements PositionRepository {
 
+    public static final String POSTGRES_UNIQUE_VIOLATION = "23505";
     private final PositionPanacheRepository panacheRepository;
     private final PositionTransactionRepository positionTransactionPanacheRepository;
     private final PositionEntityMapper positionEntityMapper;
@@ -79,19 +85,18 @@ public class PositionRepositoryAdapter implements PositionRepository {
     @Override
     @WithTransaction
     public Uni<Position> save(Position position) {
-        PositionEntity entity = positionEntityMapper.toEntity(position);
-        return panacheRepository.save(entity)
-                .map(positionEntityMapper::toDomain);
-    }
-
-    @Override
-    @WithTransaction
-    public Uni<Position> update(Position position) {
         return Uni.createFrom().item(() -> positionEntityMapper.toEntity(position))
-                .flatMap(positionEntity -> panacheRepository
-                        .getSession()
-                        .flatMap(session -> session.merge(positionEntity)))
-                .flatMap(panacheRepository::persistAndFlush)
+                .flatMap(panacheRepository::save)
+                .onFailure(this::isDuplicatePositionUniqueViolation)
+                .transform(t -> {
+                    log.warn("Position with ticker {} already exists", position.getTicker());
+                    return new ServiceException(Errors.ProcessTransactionEvent.DUPLICATED_POSITION, "Position already exists", t);
+                })
+                .onFailure(this::isDuplicateTransactionUniqueViolation)
+                .transform(t -> {
+                    log.warn("Transaction for position with ticker {} already exists", position.getTicker());
+                    return new ServiceException(Errors.ProcessTransactionEvent.ALREADY_PROCESSED, "Transaction already processed", t);
+                })
                 .map(positionEntityMapper::toDomain);
     }
 
@@ -103,8 +108,14 @@ public class PositionRepositoryAdapter implements PositionRepository {
                         .call(positionEntity -> session.fetch(positionEntity.getTransactions())
                                 .onItem().transformToUni(positionTransactionEntities -> {
                                     positionEntity.update(position);
-                                    return session.merge(positionEntity);
+                                    return session.merge(positionEntity)
+                                            .call(session::flush);
                                 })))
+                .onFailure(this::isDuplicateTransactionUniqueViolation)
+                .transform(t -> {
+                    log.warn("Transaction for position with ticker {} already exists", position.getTicker());
+                    return new ServiceException(Errors.ProcessTransactionEvent.ALREADY_PROCESSED, "Transaction already processed", t);
+                })
                 .map(positionEntityMapper::toDomainWithTransactions);
 
     }
@@ -131,5 +142,36 @@ public class PositionRepositoryAdapter implements PositionRepository {
     @WithSession
     public Uni<Boolean> isTransactionProcessed(UUID positionId, UUID transactionId) {
         return positionTransactionPanacheRepository.existsByPositionIdAndTransactionId(positionId, transactionId);
+    }
+
+    private boolean isDuplicatePositionUniqueViolation(Throwable t) {
+        ConstraintViolationException cve = findConstraintViolation(t);
+        if (cve == null) return false;
+        if (!POSTGRES_UNIQUE_VIOLATION.equals(cve.getSQLState())) return false;
+        String constraint = cve.getConstraintName();
+        String detail = cve.getMessage();
+        boolean constraintMatch = constraint != null && constraint.toLowerCase().contains("ticker");
+        boolean detailMatch = detail != null && detail.toLowerCase().contains("ticker");
+        return constraintMatch || detailMatch;
+    }
+
+    private boolean isDuplicateTransactionUniqueViolation(Throwable t) {
+        ConstraintViolationException cve = findConstraintViolation(t);
+        if (cve == null) return false;
+        if (!POSTGRES_UNIQUE_VIOLATION.equals(cve.getSQLState())) return false;
+        String constraint = cve.getConstraintName();
+        String detail = cve.getMessage();
+        boolean constraintMatch = constraint != null && constraint.toLowerCase().contains("transaction");
+        boolean detailMatch = detail != null && detail.toLowerCase().contains("transaction_id");
+        return constraintMatch || detailMatch;
+    }
+
+    private ConstraintViolationException findConstraintViolation(Throwable t) {
+        Throwable cur = t;
+        while (cur != null) {
+            if (cur instanceof ConstraintViolationException cve) return cve;
+            cur = cur.getCause();
+        }
+        return null;
     }
 } 

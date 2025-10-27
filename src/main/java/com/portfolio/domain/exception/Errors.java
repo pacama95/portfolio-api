@@ -7,6 +7,7 @@ public interface Errors {
 
         Error INVALID_INPUT = new Error(errorCode + "01");
         Error OVERSELL = new Error(errorCode + "02");
+        Error INVALID_TRANSACTION_REVERSAL = new Error(errorCode + "03");
     }
 
     interface GetPortfolioSummary {
@@ -40,6 +41,8 @@ public interface Errors {
         Error PERSISTENCE_ERROR = new Error(errorCode + "02");
         Error CALCULATION_ERROR = new Error(errorCode + "03");
         Error UNEXPECTED_ERROR = new Error(errorCode + "04");
+        Error ALREADY_PROCESSED = new Error(errorCode + "05");
+        Error DUPLICATED_POSITION = new Error(errorCode + "06");
     }
 
     interface MarketData {

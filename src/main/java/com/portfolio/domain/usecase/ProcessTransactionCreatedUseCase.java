@@ -25,7 +25,7 @@ public interface ProcessTransactionCreatedUseCase {
         record Success(Position position) implements Result {
         }
 
-        record Replay(String message, UUID transactionId, UUID positionId) implements Result {
+        record Replay(String message, UUID transactionId) implements Result {
         }
 
         record Ignored(String reason) implements Result {

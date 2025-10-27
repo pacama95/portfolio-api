@@ -263,6 +263,13 @@ public class Position {
         BigDecimal averageCost = this.averageCostPerShare != null ? this.averageCostPerShare : BigDecimal.ZERO;
         BigDecimal currentFees = this.totalTransactionFees != null ? this.totalTransactionFees : BigDecimal.ZERO;
 
+        // Prevent reversing a sell when average cost is zero, as it would result in invalid state
+        // This can happen when all buy transactions have been reversed first
+        if (averageCost.compareTo(BigDecimal.ZERO) == 0) {
+            throw new ServiceException(Errors.Position.INVALID_TRANSACTION_REVERSAL, 
+                "Cannot reverse sell transaction: average cost is zero. Reverse buy transactions first.");
+        }
+
         // Reverse the SELL: add shares back, add cost back (plus fees that were subtracted), and remove fees
         BigDecimal newTotalShares = currentShares.add(quantity);
         BigDecimal proportionalCost = quantity.multiply(averageCost);

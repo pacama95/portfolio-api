@@ -1,5 +1,8 @@
 package com.portfolio.infrastructure.persistence.adapter;
 
+import com.portfolio.domain.exception.Errors;
+import com.portfolio.domain.exception.ServiceException;
+import com.portfolio.domain.model.Currency;
 import com.portfolio.domain.model.Position;
 import com.portfolio.infrastructure.persistence.entity.PositionEntity;
 import com.portfolio.infrastructure.persistence.mapper.PositionEntityMapper;
@@ -7,10 +10,16 @@ import com.portfolio.infrastructure.persistence.repository.PositionPanacheReposi
 import com.portfolio.infrastructure.persistence.repository.PositionTransactionRepository;
 import io.smallrye.mutiny.Uni;
 import io.smallrye.mutiny.helpers.test.UniAssertSubscriber;
+import org.hibernate.exception.ConstraintViolationException;
+import org.hibernate.reactive.mutiny.Mutiny;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
+import java.sql.SQLException;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
@@ -170,5 +179,99 @@ class PositionRepositoryAdapterTest {
         Long result = uni.subscribe().withSubscriber(UniAssertSubscriber.create()).assertCompleted().getItem();
 
         assertEquals(7L, result);
+    }
+
+    @Test
+    void testSave_DuplicateTicker_IsMappedToServiceExceptionDuplicatedPosition() {
+        // Given: Save fails with duplicate ticker constraint violation
+        Position domain = new Position("AAPL", Currency.USD);
+        PositionEntity entity = new PositionEntity();
+        when(positionEntityMapper.toEntity(domain)).thenReturn(entity);
+
+        SQLException root = new SQLException("duplicate key", PositionRepositoryAdapter.POSTGRES_UNIQUE_VIOLATION);
+        ConstraintViolationException cve = new ConstraintViolationException(
+                "unique violation positions.ticker",
+                root,
+                "INSERT INTO positions ...",
+                "uk_positions_ticker");
+
+        when(panacheRepository.save(entity)).thenReturn(Uni.createFrom().failure(cve));
+
+        // When
+        Uni<Position> uni = adapter.save(domain);
+        Throwable failure = uni.subscribe().withSubscriber(UniAssertSubscriber.create()).assertFailed().getFailure();
+
+        // Then
+        assertInstanceOf(ServiceException.class, failure);
+        ServiceException se = (ServiceException) failure;
+        assertEquals(Errors.ProcessTransactionEvent.DUPLICATED_POSITION, se.getError());
+    }
+
+    @Test
+    void testSave_DuplicateTransaction_IsMappedToServiceExceptionAlreadyProcessed() {
+        // Given: Save fails with duplicate transaction_id constraint violation
+        Position domain = new Position("MSFT", Currency.USD);
+        PositionEntity entity = new PositionEntity();
+        when(positionEntityMapper.toEntity(domain)).thenReturn(entity);
+
+        SQLException root = new SQLException("duplicate key", PositionRepositoryAdapter.POSTGRES_UNIQUE_VIOLATION);
+        ConstraintViolationException cve = new ConstraintViolationException(
+                "unique violation position_transactions.transaction_id",
+                root,
+                "INSERT INTO position_transactions ...",
+                "uk_position_transactions_transaction_id");
+
+        when(panacheRepository.save(entity)).thenReturn(Uni.createFrom().failure(cve));
+
+        // When
+        Uni<Position> uni = adapter.save(domain);
+        Throwable failure = uni.subscribe().withSubscriber(UniAssertSubscriber.create()).assertFailed().getFailure();
+
+        // Then
+        assertInstanceOf(ServiceException.class, failure);
+        ServiceException se = (ServiceException) failure;
+        assertEquals(Errors.ProcessTransactionEvent.ALREADY_PROCESSED, se.getError());
+    }
+
+    @Test
+    void testUpdatePositionWithTransactions_DuplicateTransactionDuringFlush_IsMappedToServiceExceptionAlreadyProcessed() {
+        // Given: Flush fails with duplicate transaction_id constraint violation
+        UUID positionId = UUID.randomUUID();
+        Position domain = new Position(
+                positionId, "GOOGL", BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO,
+                BigDecimal.ZERO, BigDecimal.ZERO, Currency.USD, LocalDate.now(), LocalDate.now(), true,
+                Instant.now(), null, null, new ArrayList<>()
+        );
+
+        Mutiny.Session session = mock(Mutiny.Session.class);
+        PositionEntity managedEntity = new PositionEntity();
+        managedEntity.setId(positionId);
+        managedEntity.setTicker("GOOGL");
+        managedEntity.setTransactions(new ArrayList<>());
+
+        when(panacheRepository.getSession()).thenReturn(Uni.createFrom().item(session));
+        when(session.find(PositionEntity.class, positionId)).thenReturn(Uni.createFrom().item(managedEntity));
+        when(session.fetch(managedEntity.getTransactions())).thenReturn(Uni.createFrom().item(new ArrayList<>()));
+        when(session.merge(any(PositionEntity.class))).thenAnswer(inv -> {
+            PositionEntity updatedPositionEntity = inv.getArgument(0);
+            return Uni.createFrom().item(updatedPositionEntity);
+        });
+
+        SQLException root = new SQLException("duplicate key", PositionRepositoryAdapter.POSTGRES_UNIQUE_VIOLATION);
+        ConstraintViolationException cve = new ConstraintViolationException(
+                "unique violation position_transactions.transaction_id",
+                root,
+                "INSERT INTO position_transactions ...",
+                "uk_position_transactions_transaction_id");
+        when(session.flush()).thenReturn(Uni.createFrom().failure(cve));
+
+        // When
+        Uni<Position> uni = adapter.updatePositionWithTransactions(domain);
+        Throwable failure = uni.subscribe().withSubscriber(UniAssertSubscriber.create()).assertFailed().getFailure();
+
+        // Then
+        assertInstanceOf(ServiceException.class, failure);
+        ServiceException se = (ServiceException) failure;
+        assertEquals(Errors.ProcessTransactionEvent.ALREADY_PROCESSED, se.getError());
     }
 } 

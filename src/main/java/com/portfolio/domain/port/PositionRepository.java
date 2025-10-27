@@ -23,14 +23,12 @@ public interface PositionRepository {
 
     Uni<Position> save(Position position);
 
-    Uni<Position> update(Position position);
-
     Uni<Position> updatePositionWithTransactions(Position position);
 
     Uni<Boolean> existsByTicker(String ticker);
 
     Uni<Long> countAll();
-    
+
     Uni<Long> countWithShares();
 
     Uni<Boolean> isTransactionProcessed(UUID positionId, UUID transactionId);
